@@ -1,0 +1,30 @@
+{
+  "name": "cbox",
+  "bin": {
+    "cbox": "index.js"
+  },
+  "version": "0.0.1",
+  "description": "Simple content storage.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "content",
+    "storage"
+  ],
+  "author": "masahito suzuki <maachang@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maachang/cbox.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maachang/cbox/issues"
+  },
+  "homepage": "https://github.com/maachang/cbox#readme",
+  "dependencies": {
+    "big-integer": "^1.6.43"
+  },
+  "devDependencies": {}
+}

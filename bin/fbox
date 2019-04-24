@@ -1,0 +1,2 @@
+ARGS=${*}
+node ${CBOX_HOME}/index ${ARGS}
