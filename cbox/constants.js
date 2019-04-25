@@ -21,8 +21,8 @@ module.exports = (function () {
   // サーバ名.
   o.SERVER_NAME = "" + o.NAME + "(" + o.VERSION + ")";
 
-  // コンフィグフォルダ/
-  o.CONFIG_DIR = "./conf";
+  // コンフィグフォルダ.
+  o.CONF_DIR = "./conf";
   
   // デフォルトバインドポート.
   o.PORT = 3210;

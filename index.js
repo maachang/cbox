@@ -30,57 +30,13 @@
   // 起動パラメータをargsCmdにセット.
   var argv_params = argsCmd.getArgv();
 
-  // 起動時のパラメータ情報を取得.
-  var startParams = function(message, options) {
-    var params = [message];
-    var len = options.length;
-    for(var i = 0;i < len;i ++) {
-      params.push(options[i]);
-    }
-    var ret = null
-    try {
-      ret = argsCmd.get.apply(null, params);
-      if (ret) {
-        argsCmd.remove.apply(null, options);
-      } else {
-        ret = null;
-      }
-    } catch (e) {
-      ret = null
-    }
-    return ret;
-  }
-
-  // 数字変換.
-  var toNum = function(n) {
-    if(n) {
-      try { n = parseInt(n); } catch(e) { n = null; }
-    } else {
-      n = null;
-    }
-    return n;
-  }
-
-  // boolean変換.
-  var toBool = function(n) {
-    if(n) {
-      try {
-        if(n == "true" || n == "t" || n == "on") n = true;
-        else if(n == "false" || n == "f" || n == "off") n = false;
-      } catch(e) { n = null; }
-    } else {
-      n = null;
-    }
-    return n;
-  }
-
   // 起動パラメータを取得.
-  var port = toNum(startParams("サーバ-バインドポートを設定します", ["-p", "--port"]));
-  var timeout = toNum(startParams("レスポンスタイムアウト値を設定します", ["-t", "--timeout"]));
-  var env = startParams("実行環境名を設定します", ["-e", "--env"]);
-  var notCache = toBool(startParams("レスポンスキャッシュを行わない場合[true]", ["-n", "--notCache"]));
-  var closeFlag = toBool(startParams("keepAliveを行わない場合[true]", ["-c", "--close"]));
-  var csize = toNum(startParams("クラスタ数を設定します", ["-l", "--cluster"]));
+  var port = argsCmd.registrationParams("number", "サーバ-バインドポートを設定します", ["-p", "--port"]);
+  var timeout = argsCmd.registrationParams("number", "レスポンスタイムアウト値を設定します", ["-t", "--timeout"]);
+  var env = argsCmd.registrationParams("string", "実行環境名を設定します", ["-e", "--env"]);
+  var notCache = argsCmd.registrationParams("boolean", "レスポンスキャッシュを行わない場合[true]", ["-n", "--notCache"]);
+  var closeFlag = argsCmd.registrationParams("boolean", "keepAliveを行わない場合[true]", ["-c", "--close"]);
+  var csize = argsCmd.registrationParams("number", "クラスタ数を設定します", ["-l", "--cluster"]);
   if(csize == null) {
     csize = require('os').cpus().length;;
   }

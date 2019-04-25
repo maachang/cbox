@@ -4,6 +4,7 @@
 module.exports = function (baseDir) {
   'use strict';
 
+  var constants = require("./constants");
   var file = require("../lib/file");
 
   // コンフィグ情報.
@@ -11,7 +12,7 @@ module.exports = function (baseDir) {
 
   // コンフィグ読み込み先フォルダ.
   if(!baseDir) {
-    baseDir = "./conf";
+    baseDir = constants.CONF_DIR;
   }
   var _CONFIG_DIR = baseDir;
 
