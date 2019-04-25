@@ -65,12 +65,23 @@ module.exports = function (baseDir) {
 
   // コンフィグ情報を読み込む.
   return {
+    // コンフィグ情報を取得.
     getConfig: function() {
       if(_CONFIG == null) {
-        _CONFIG = {};
-        _readConfig(_CONFIG, _CONFIG_DIR)
+        var conf = {};
+        _readConfig(conf, _CONFIG_DIR);
+        conf = Object.freeze(conf);
+        _CONFIG = conf;
       }
       return _CONFIG;
+    },
+    // コンフィグ情報をリロード.
+    reload: function() {
+      var conf = {};
+      _readConfig(conf, _CONFIG_DIR)
+      conf = Object.freeze(conf);
+      _CONFIG = conf;
+      return conf;
     }
   };
 }

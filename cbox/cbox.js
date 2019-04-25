@@ -54,6 +54,32 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
     return u.substring(0, p);
   }
 
+  // urlに./ や ..が存在するかチェック.
+  var _checkUrl = function(url, res, closeFlag) {
+    if(url.indexOf("../") != -1) {
+      http.errorFileResult(403,
+        {message: "不正なURLを検知:" + url},
+        res,
+        closeFlag);
+      return false;
+    }
+    return true;
+  }
+
+  // URLにTOPフォルダにファイルを指定している場合はエラー返却.
+  // ファイルのI/Oに対して有効.
+  var _topUrlCheck = function(url, res, closeFlag) {
+    var p = url.indexOf("/", 1);
+    if(p == -1 || p + 1 == url.length) {
+      http.errorFileResult(403,
+        {message: "ルートフォルダにファイルは設定できません:" + url},
+        res,
+        closeFlag);
+      return false;
+    }
+    return true;
+  }
+
   // 元のファイルを一時ファイルにリネーム.
   var _moveByTmp = function(name) {
     var ret = null;
@@ -86,6 +112,13 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
       {message: "ロックタイムアウト:" + url},
       res,
       closeFlag);
+  }
+
+  // リクエストを閉じる処理.
+  var _closeReq = function(req) {
+    // リクエストを閉じる.
+    try {req.end();} catch(e) {}
+    try {req.close();} catch(e) {}
   }
 
   // CBOX: 処理区分.
@@ -133,6 +166,13 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
       var url = _getUrl(req);
       var name = _CBOX_FOLDER + url;
 
+      // URL不正チェック.
+      if(!_checkUrl(url, res, closeFlag)) {
+        // リクエストを閉じる.
+        _closeReq(req);
+        return false;
+      }
+
       // methodで処理を分ける.
       if(method == "post") {
 
@@ -140,16 +180,15 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         if(executeType == _CBOX_EXECUTE_TYPE_CREATE_FILE) {
           return this.createFile(name, url, req, res);
         }
-        
-        // リクエストを閉じる.
-        try {req.end();} catch(e) {}
-        try {req.close();} catch(e) {}
 
         // エラー返却.
         http.errorFileResult(500,
           {message: "処理タイプ[" + executeType + "]に対してmethodが POST で処理できません:" + url},
           res,
           closeFlag);
+        
+        // リクエストを閉じる.
+        _closeReq(req);
         return false;
 
       } else if(method == "get") {
@@ -177,15 +216,14 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         }
       }
 
-      // リクエストを閉じる.
-      try {req.end();} catch(e) {}
-      try {req.close();} catch(e) {}
-
       // エラー返却.
       http.errorFileResult(500,
         {message: "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url},
         res,
         closeFlag);
+
+      // リクエストを閉じる.
+      _closeReq(req);
       return false;
     
     } catch(error) {
@@ -268,6 +306,10 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
           _errorLockTimeout(url, res, notCache, closeFlag);
           return false;
         }
+        // URLが不正な場合.
+        if(!_topUrlCheck(url, res, closeFlag)) {
+          return false;
+        }
         if(file.isDir(name)) {
 
           // アンロック.
@@ -342,8 +384,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
           out = null;
 
           // リクエストを閉じる.
-          try {req.end();} catch(e) {}
-          try {req.close();} catch(e) {}
+          _closeReq(req);
 
           // 書き込み中のファイルを削除.
           file.removeFile(name);
@@ -378,6 +419,10 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
+          return false;
+        }
+        // URLが不正な場合.
+        if(!_topUrlCheck(url, res, closeFlag)) {
           return false;
         }
         // favicon.icoの場合は404 返却.
@@ -478,6 +523,10 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
           _errorLockTimeout(url, res, notCache, closeFlag);
           return false;
         }
+        // URLが不正な場合.
+        if(!_topUrlCheck(url, res, closeFlag)) {
+          return false;
+        }
         if(file.removeFile(name)) {
           http.sendJson(res, null,
             {result:"success", status: 200, message: "ファイルの削除に成功しました:" + url},
@@ -563,6 +612,10 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
+          return false;
+        }
+        // URLが不正な場合.
+        if(!_topUrlCheck(url, res, closeFlag)) {
           return false;
         }
         http.sendJson(res, null,
