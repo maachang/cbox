@@ -148,6 +148,9 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   // CBOX: 処理区分: フォルダ存在.
   var _CBOX_EXECUTE_TYPE_IS_FOLDER= "is-folder";
 
+  // CBOX: ロック状態を取得.
+  var _CBOX_EXECUTE_TYPE_IS_LOCK = "is-lock";
+
   // 環境コンフィグ情報をセット.
   o.setEnvConf = function(c) {
     envConf = c;
@@ -202,6 +205,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
             return this.isFile(name, url, req, res);
           case _CBOX_EXECUTE_TYPE_IS_FOLDER:
             return this.isFolder(name, url, req, res);
+          case _CBOX_EXECUTE_TYPE_IS_LOCK:
+            return this.isLock(name, url, req, res);
           
           // GETファイル指定、もしくは指定なしは[getFile処理]
           case _CBOX_EXECUTE_TYPE_GET_FILE:
@@ -601,7 +606,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
               fileSize: stat.size,            // ファイルサイズ(byte)
               fileTime: stat.mtime.getTime(), // ファイルタイム(unixTime)
               isFile: stat.isFile,            // ファイルの場合[true]
-              isDir: stat.isDir               // フォルダの場合[true]
+              isDir: stat.isDir,              // フォルダの場合[true]
+              isLock: psync.isLock(name)      // ロック状態.
             });
           }
 
@@ -675,6 +681,39 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         } else {
           http.sendJson(res, null,
             {result:"success", status: 200, message: "フォルダチェック結果:" + url, value: file.isDir(name)},
+            200,
+            notCache, closeFlag);
+        }
+      } catch(e) {
+        http.errorFileResult(500, e, res, closeFlag);
+        ret = false;
+      } finally {
+        // アンロック.
+        psync.readUnlock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
+      }
+      return ret;
+    });
+  }
+
+  // 対象フォルダ・ファイルはロックされているかチェック.
+  // 先頭フォルダ名で読み込み、書き込みロックを行います.
+  o.isLock = function(name, url, req, res) {
+    var topName = _topFolderName(url);
+    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
+      try {
+        // ロックタイムアウト.
+        if(!successFlag) {
+          _errorLockTimeout(url, res, notCache, closeFlag);
+          ret = false;
+        // 正常処理.
+        } else {
+          http.sendJson(res, null,
+            {result:"success", status: 200, message: "ロックチェック結果:" + url, value: psync.isLock(name)},
             200,
             notCache, closeFlag);
         }
