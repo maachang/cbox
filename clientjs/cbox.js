@@ -4,17 +4,17 @@
 (function(_g) {
   'use strict';
 
-////////////////////////////////////////////////////////////////////////////////
-// 通常Ajax処理.
-// method : POST or GET.
-// URL : 接続先URL.
-// params : パラメータ設定(Map定義).
-// func : コールバックファンクション.
-//        コールバックファンクションを設定しない場合は、同期取得(非推奨).
-// errorFunc : エラー発生時のコールバックファンクション.
-// noCache : キャッシュなしの場合は[true].
-// header : ヘッダ情報.
-////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////
+  // 通常Ajax処理.
+  // method : POST or GET.
+  // URL : 接続先URL.
+  // params : パラメータ設定(Map定義).
+  // func : コールバックファンクション.
+  //        コールバックファンクションを設定しない場合は、同期取得(非推奨).
+  // errorFunc : エラー発生時のコールバックファンクション.
+  // noCache : キャッシュなしの場合は[true].
+  // header : ヘッダ情報.
+  ////////////////////////////////////////////////////////////////////////////////
   var _ajax = (function(){
     var ie = false ;
     var xdom = false ;
@@ -80,7 +80,7 @@
     
     var head = function(m,x,h){
       if(m=='POST') {
-        x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+        x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
       }
       else if(m=='JSON') {
         x.setRequestHeader('Content-Type', 'application/json');
@@ -418,6 +418,7 @@
     _ajax("GET", url, params, result, errorResult, noCache, header);
   }
 
+  // オブジェクト.
   var o = {};
 
   // フォルダ作成.
