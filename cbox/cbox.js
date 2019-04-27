@@ -16,7 +16,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   var envConf = null;
 
   // テンポラリファイルのunique数.
-  var _TMP_UNIQUE_LENGTH = 32;
+  var _TMP_UNIQUE_LENGTH = 48;
 
   // ロックタイムアウト(5秒).
   var _LOCK_TIMEOUT = 5000;
@@ -161,6 +161,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   // cbox処理.
   o.executeCbox = function(req, res) {
     try {
+      var ret = true;
       var executeType = req.headers[_CBOX_EXECUTE_TYPE];
       var method = req.method.toLowerCase();
       var url = _getUrl(req);
@@ -168,13 +169,10 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
       // URL不正チェック.
       if(!_checkUrl(url, res, closeFlag)) {
-        // リクエストを閉じる.
-        _closeReq(req);
-        return false;
-      }
-
+        ret = false;
+      
       // methodで処理を分ける.
-      if(method == "post") {
+      } else if(method == "post") {
 
         // ファイル作成・更新処理.
         if(executeType == _CBOX_EXECUTE_TYPE_CREATE_FILE) {
@@ -187,10 +185,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
           res,
           closeFlag);
         
-        // リクエストを閉じる.
-        _closeReq(req);
-        return false;
-
+        ret = false;
       } else if(method == "get") {
 
         // 各処理.
@@ -215,20 +210,25 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
             return this.getFile(name, url, req, res);
         }
       }
-
       // エラー返却.
       http.errorFileResult(500,
         {message: "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url},
         res,
         closeFlag);
 
-      // リクエストを閉じる.
-      _closeReq(req);
-      return false;
+      ret = false;
+      return ret;
     
     } catch(error) {
       http.errorFileResult(500, error, res, closeFlag);
-      return false;
+
+      ret = false;
+      return ret;
+    } finally {
+      if(!ret) {
+        // リクエストを閉じる.
+        _closeReq(req);
+      }
     }
   }
 
@@ -236,31 +236,38 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   o.createFolder = function(name, url, req, res) {
     var topName = _topFolderName(url);
     psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
-          return false;
-        }
-        if(file.mkdirs(name)) {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "フォルダの作成に成功しました:" + url},
-            200,
-            notCache, closeFlag);
-          return true;
-        } else {
+          ret = false;
+        // フォルダ作成失敗.
+        } else if(!file.mkdirs(name)) {
           http.errorFileResult(500,
             {message: "フォルダの作成に失敗しました:" + url},
             res,
             closeFlag);
-          return false;
+          ret = false;
+        // 処理成功.
+        } else {
+          http.sendJson(res, null,
+            {result:"success", status: 200, message: "フォルダの作成に成功しました:" + url},
+            200,
+            notCache, closeFlag);
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
-        return false;
+        ret = false;
       } finally {
+        // アンロック.
         psync.unlock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
       }
+      return ret;
     });
   }
 
@@ -268,31 +275,38 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   o.removeFolder = function(name, url, req, res) {
     var topName = _topFolderName(url);
     psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
-          return false;
-        }
-        if(file.delete(name)) {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "フォルダの削除に成功しました:" + url},
-            200,
-            notCache, closeFlag);
-          return true;
-        } else {
+          ret = false;
+        // 削除フォルダが存在しない.
+        } else if(!file.delete(name)) {
           http.errorFileResult(500,
             {message: "フォルダの削除に失敗しました:" + url},
             res,
             closeFlag);
-          return false;
+          ret = false;
+        // 処理成功.
+        } else {
+          http.sendJson(res, null,
+            {result:"success", status: 200, message: "フォルダの削除に成功しました:" + url},
+            200,
+            notCache, closeFlag);
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
-        return false;
+        ret = false;
       } finally {
+        // アンロック.
         psync.unlock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
       }
+      return ret;
     });
   }
 
@@ -300,216 +314,212 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   o.createFile = function(name, url, req, res) {
     var topName = _topFolderName(url);
     psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
-          return false;
-        }
+          ret = false;
         // URLが不正な場合.
-        if(!_topUrlCheck(url, res, closeFlag)) {
-          return false;
-        }
-        if(file.isDir(name)) {
-
-          // アンロック.
-          psync.unlock(topName);
-
+        } else if(!_topUrlCheck(url, res, closeFlag)) {
+          ret = false;
+        // 同じファイル名で既にフォルダが存在している.
+        } else if(file.isDir(name)) {
           http.errorFileResult(403,
             {message: "ファイル作成に失敗しました: 同じフォルダ名が存在します:" + url},
             res,
             closeFlag);
-          return false;
-        }
-        if(!file.isDir(_getFolder(name))) {
-
-          // アンロック.
-          psync.unlock(topName);
-
+          ret = false;
+        // ファイルを設置するフォルダ名が存在しない場合エラー..
+        } else if(!file.isDir(_getFolder(name))) {
           http.errorFileResult(403,
             {message: "ファイル作成に失敗しました: フォルダが存在しません:" + url},
             res,
             closeFlag);
-          return false;
-        }
-
-        // 既に元のファイルが存在するかチェック.
-        var oldFile = null;
-
-        // 元のファイルが存在する場合.
-        if(file.isFile(name)) {
-
-          // 元のファイル名をテンポラリファイルに移動.
-          oldFile = _moveByTmp(name);
-        }
-
-        // データ書き込み先.
-        var out = fs.createWriteStream(name);
-
-        // データ書き込み中.
-        req.on("data", function (chunk) {
-          out.write(chunk);
-        });
-
-        // データ終了.
-        req.on("end", function () {
-          out.end();
-          out.close();
-          out = null;
-
-          // 元のファイルが存在する場合.
-          if(oldFile != null) {
-
-            // 元のファイルを削除.
-            file.removeFile(oldFile);
-          }
-
-          // アンロック.
-          psync.unlock(topName);
-
-          // 正常終了を返却.
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "ファイルの作成に成功しました:" + url},
-            200,
-            notCache, closeFlag);
-        });
-
-        // 処理中エラー.
-        req.on("error", function(err) {
-          console.debug(err);
-
-          // 書き込み途中のデータを破棄.
-          try {out.end();} catch(e) {}
-          try {out.close();} catch(e) {}
-          out = null;
-
-          // リクエストを閉じる.
-          _closeReq(req);
-
-          // 書き込み中のファイルを削除.
-          file.removeFile(name);
-
-          // 元のファイルが存在する場合.
-          if(oldFile != null) {
-
-            // テンポラリファイルを元のファイルに戻す.
-            file.rename(oldFile, name);
-          }
-
-          // アンロック.
-          psync.unlock(topName);
+          ret = false;
         
-          // エラー返却.
-          http.errorFileResult(500, err, res, closeFlag);
-        });
+        // ファイル書き込み.
+        } else {
+
+          // 既に元のファイルが存在するかチェック.
+          var oldFile = null;
+
+          // 元のファイルが存在する場合.
+          if(file.isFile(name)) {
+
+            // 元のファイル名をテンポラリファイルに移動.
+            oldFile = _moveByTmp(name);
+          }
+
+          // データ書き込み先.
+          var out = fs.createWriteStream(name);
+
+          // データ書き込み中.
+          req.on("data", function (chunk) {
+            out.write(chunk);
+          });
+
+          // データ終了.
+          req.on("end", function () {
+            out.end();
+            out.close();
+            out = null;
+
+            // 元のファイルが存在する場合.
+            if(oldFile != null) {
+
+              // 元のファイルを削除.
+              file.removeFile(oldFile);
+            }
+
+            // アンロック.
+            psync.unlock(topName);
+
+            // 正常終了を返却.
+            http.sendJson(res, null,
+              {result:"success", status: 200, message: "ファイルの作成に成功しました:" + url},
+              200,
+              notCache, closeFlag);
+          });
+
+          // 処理中エラー.
+          req.on("error", function(err) {
+            // 書き込み途中のデータを破棄.
+            try {out.end();} catch(e) {}
+            try {out.close();} catch(e) {}
+            out = null;
+
+            // 書き込み中のファイルを削除.
+            file.removeFile(name);
+
+            // 元のファイルが存在する場合.
+            if(oldFile != null) {
+
+              // テンポラリファイルを元のファイルに戻す.
+              file.rename(oldFile, name);
+            }
+
+            // アンロック.
+            psync.unlock(topName);
+          
+            // エラー返却.
+            http.errorFileResult(500, err, res, closeFlag);
+
+            // リクエストを閉じる.
+            _closeReq(req);
+            console.debug(err);
+          });
+        }
       } catch(e) {
+        http.errorFileResult(500, e, res, closeFlag);
+        var ret = false;
+      } finally {
 
         // アンロック.
         psync.unlock(topName);
-        return false;
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
       }
+      return ret;
     });
   }
 
   // ファイルの取得.
   o.getFile = function(name, url, req, res) {
     var topName = _topFolderName(url);
-    psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
-          return false;
-        }
+          ret = false;
         // URLが不正な場合.
-        if(!_topUrlCheck(url, res, closeFlag)) {
-          return false;
-        }
+        } else if(!_topUrlCheck(url, res, closeFlag)) {
+          ret = false;
         // favicon.icoの場合は404 返却.
-        if(url == _FAVICON_ICO) {
-          return http.sendFaviconIco(res, {}, closeFlag);
-        }
-        if(!file.isFile(name)) {
-
-          // アンロック.
-          psync.unlock(topName);
-
+        } else if(url == _FAVICON_ICO) {
+          http.sendFaviconIco(res, {}, closeFlag);
+          ret = false;
+        // ファイルが存在しない場合は404エラー.
+        } else if(!file.isFile(name)) {
           http.errorFileResult(404,
             {message: "指定ファイルは存在しません:" + url},
             res,
             closeFlag);
-          return false;
-        }
-        var stat = file.stat(name);
-        var headers = {};
-        var mime = http.mimeType(name, envConf);
-        var mtime = new Date(stat.mtime.getTime());
+          ret = false;
+        
+        // ファイル読み込み.
+        } else {
 
-        // ヘッダ情報をセット.
-        headers['Content-Type'] = mime;
-        headers['Last-Modified'] = http.toRfc822(mtime);
+          // キャッシュありのチェック.
+          var stat = file.stat(name);
+          var headers = {};
+          var mime = http.mimeType(name, envConf);
+          var mtime = new Date(stat.mtime.getTime());
 
-        // キャッシュ情報の場合.
-        // notCache = true の場合はキャッシュは取らない.
-        if (!notCache && req.headers["if-modified-since"] && http.isCache(mtime, req.headers["if-modified-since"])) {
+          // ヘッダ情報をセット.
+          headers['Content-Type'] = mime;
+          headers['Last-Modified'] = http.toRfc822(mtime);
 
-          // 返却処理.
-          try {
+          // キャッシュ情報の場合.
+          // notCache = true の場合はキャッシュは取らない.
+          if (!notCache && req.headers["if-modified-since"] && http.isCache(mtime, req.headers["if-modified-since"])) {d
             // クロスヘッダ対応. 
             http.setCrosHeader(headers, 0, notCache, closeFlag);
             res.writeHead(304, headers);
             res.end("");
-            return true;
-          } catch(e) {
-            http.errorFileResult(500, e, res, closeFlag);
-          } finally {
+          } else {
 
-            // アンロック.
-            psync.unlock(topName);
+            // キャッシュなしの場合.
+            try {
+              // クロスヘッダ対応.
+              http.setCrosHeader(headers, stat.size, notCache, closeFlag);
+              res.writeHead(200, headers);
+
+              // ファイルの返信は「生データ」を返却.
+              var rs = fs.createReadStream(name);
+              rs.on('data', function (data) {
+                res.write(data);
+              });
+              rs.on('end', function () {
+                res.end();
+
+                // アンロック.
+                psync.readUnlock(topName);
+              });
+              rs.on("error", function(err) {
+                try { res.end(); } catch(e) {}
+                try { rs.close(); } catch(e) {}
+
+                // アンロック.
+                psync.readUnlock(topName);
+
+                // リクエストを閉じる.
+                _closeReq(req);
+                console.debug(err);
+              })
+            } catch(e) {
+              http.errorFileResult(500, e, res, closeFlag);
+              ret = false;
+            }
           }
-          return false;
         }
 
-        // キャッシュでない場合.
-        try {
-          // クロスヘッダ対応.
-          http.setCrosHeader(headers, stat.size, notCache, closeFlag);
-          res.writeHead(200, headers);
-
-          // ファイルの返信は「生データ」を返却.
-          var rs = fs.createReadStream(name);
-          rs.on('data', function (data) {
-            res.write(data);
-          });
-          rs.on('end', function () {
-            res.end();
-
-            // アンロック.
-            psync.unlock(topName);
-          });
-          rs.on("error", function(err) {
-            try { res.end(); } catch(e) {}
-            try { rs.close(); } catch(e) {}
-
-            // アンロック.
-            psync.unlock(topName);
-            console.debug(e);
-          })
-        } catch(e) {
-
-          // アンロック.
-          psync.unlock(topName);
-          http.errorFileResult(500, e, res, closeFlag);
-          return false;
-        }
-        return true;
       } catch(e) {
-
-        // アンロック.
-        psync.unlock(topName);
         http.errorFileResult(500, e, res, closeFlag);
-        return false;
+        ret = false;
+      } finally {
+        // アンロック.
+        psync.readUnlock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
       }
+      return ret;
     });
   }
 
@@ -517,142 +527,169 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   o.removeFile = function(name, url, req, res) {
     var topName = _topFolderName(url);
     psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
-          return false;
-        }
+          ret = false;
         // URLが不正な場合.
-        if(!_topUrlCheck(url, res, closeFlag)) {
-          return false;
-        }
-        if(file.removeFile(name)) {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "ファイルの削除に成功しました:" + url},
-            200,
-            notCache, closeFlag);
-          return true;
-        } else {
+        } else if(!_topUrlCheck(url, res, closeFlag)) {
+          ret = false;
+        // ファイルが存在しない.
+        } else if(!file.removeFile(name)) {
           http.errorFileResult(500,
             {message: "ファイルの削除に失敗しました:" + url},
             res,
             closeFlag);
-          return false;
+          ret = false;
+        // 処理成功.
+        } else {
+          http.sendJson(res, null,
+            {result:"success", status: 200, message: "ファイルの削除に成功しました:" + url},
+            200,
+            notCache, closeFlag);
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
-        return false;
+        ret = false;
       } finally {
+        // アンロック.
         psync.unlock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
       }
+      return ret;
     });
   }
 
   // 対象フォルダ配下のファイル・フォルダ一覧を取得.
   o.list = function(name, url, req, res) {
     var topName = _topFolderName(url);
-    psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
-          return false;
-        }
-        if(!file.isDir(name)) {
+          ret = false;
+        // 指定フォルダが存在しない.
+        } else if(!file.isDir(name)) {
           http.errorFileResult(403,
             {message: "リスト取得に失敗しました: フォルダではありません: " + url},
             res,
             closeFlag);
-          return false;
-        }
-
-        // 指定フォルダ以下のリストを取得.
-        var ret = [];
-        var n = null;
-        var stat = null;
-        var list = file.list(name);
-        var len = list.length;
-        for(var i = 0; i < len; i ++) {
-          n = list[i];
-          stat = file.stat(name + "/" + n);
-          if(stat == null) {
-            continue;
+          ret = false;
+        // リスト一覧取得.
+        } else {
+          // 指定フォルダ以下のリストを取得.
+          var ret = [];
+          var n = null;
+          var stat = null;
+          var list = file.list(name);
+          var len = list.length;
+          for(var i = 0; i < len; i ++) {
+            n = list[i];
+            stat = file.stat(name + "/" + n);
+            if(stat == null) {
+              continue;
+            }
+            ret.push({
+              name: name,                     // ファイル/フォルダ名
+              fileSize: stat.size,            // ファイルサイズ(byte)
+              fileTime: stat.mtime.getTime(), // ファイルタイム(unixTime)
+              isFile: stat.isFile,            // ファイルの場合[true]
+              isDir: stat.isDir               // フォルダの場合[true]
+            });
           }
-          ret.push({
-            name: name,                     // ファイル/フォルダ名
-            fileSize: stat.size,            // ファイルサイズ(byte)
-            fileTime: stat.mtime.getTime(), // ファイルタイム(unixTime)
-            isFile: stat.isFile,            // ファイルの場合[true]
-            isDir: stat.isDir               // フォルダの場合[true]
-          });
+
+          // 処理結果返却.
+          http.sendJson(res, null,
+            {result:"success", status: 200, message: "リスト取得に成功しました:" + url, value: ret},
+            200,
+            notCache, closeFlag);
         }
-
-        // 処理結果返却.
-        http.sendJson(res, null,
-          {result:"success", status: 200, message: "リスト取得に成功しました:" + url, value: ret},
-          200,
-          notCache, closeFlag);
-        return true;
-
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
-        return false;
+        ret = false;
       } finally {
-        psync.unlock(topName);
+        // アンロック.
+        psync.readUnlock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
       }
+      return ret;
     });
   }
 
   // 指定ファイルが存在するかチェック.
   o.isFile = function(name, url, req, res) {
     var topName = _topFolderName(url);
-    psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
-          return false;
-        }
+          ret = false;
         // URLが不正な場合.
-        if(!_topUrlCheck(url, res, closeFlag)) {
-          return false;
+        } else if(!_topUrlCheck(url, res, closeFlag)) {
+          ret = false;
+        // 正常処理.
+        } else {
+          http.sendJson(res, null,
+            {result:"success", status: 200, message: "ファイルチェック結果:" + url, value: file.isFile(name)},
+            200,
+            notCache, closeFlag);
         }
-        http.sendJson(res, null,
-          {result:"success", status: 200, message: "ファイルチェック結果:" + url, value: file.isFile(name)},
-          200,
-          notCache, closeFlag);
-        return true;
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
-        return false;
+        ret = false;
       } finally {
-        psync.unlock(topName);
+        // アンロック.
+        psync.readUnlock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
       }
+      return ret;
     });
   }
 
   // 指定フォルダが存在するかチェック.
   o.isFolder = function(name, url, req, res) {
     var topName = _topFolderName(url);
-    psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+      var ret = true;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
-          return false;
+          ret = false;
+        // 正常処理.
+        } else {
+          http.sendJson(res, null,
+            {result:"success", status: 200, message: "フォルダチェック結果:" + url, value: file.isDir(name)},
+            200,
+            notCache, closeFlag);
         }
-        http.sendJson(res, null,
-          {result:"success", status: 200, message: "フォルダチェック結果:" + url, value: file.isDir(name)},
-          200,
-          notCache, closeFlag);
-        return true;
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
-        return false;
+        ret = false;
       } finally {
-        psync.unlock(topName);
+        // アンロック.
+        psync.readUnlock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
       }
+      return ret;
     });
   }
 
