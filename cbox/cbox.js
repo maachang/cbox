@@ -466,7 +466,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
           // キャッシュ情報の場合.
           // notCache = true の場合はキャッシュは取らない.
-          if (!notCache && req.headers["if-modified-since"] && http.isCache(mtime, req.headers["if-modified-since"])) {d
+          if (!notCache && req.headers["if-modified-since"] && http.isCache(mtime, req.headers["if-modified-since"])) {
             // クロスヘッダ対応. 
             http.setCrosHeader(headers, 0, notCache, closeFlag);
             res.writeHead(304, headers);
