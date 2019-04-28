@@ -62,7 +62,7 @@ module.exports = (function () {
     var body = "";
     if (status >= 500) {
       if(err != null) {
-        console.error(err + " status:" + status, err);
+        console.error("status:" + status, err);
       } else {
         console.error("error: " + status);
       }

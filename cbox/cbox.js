@@ -30,8 +30,40 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   // favicon.ico.
   var _FAVICON_ICO = "/favicon.ico";
 
+
   // cbox 書き込み許可シグニチャ.
-  var _WRITE_SIGNATURES = "x-cbox-write-signatures"
+  var _CBOX_WRITE_SIGNATURES = "x-cbox-write-signatures"
+
+
+  // CBOX: 処理区分.
+  var _CBOX_EXECUTE_TYPE = "x-cbox-execute-type";
+
+  // CBOX: 処理区分: フォルダ作成.
+  var _CBOX_EXECUTE_TYPE_CREATE_FOLDER = "create-folder";
+
+  // CBOX: 処理区分: フォルダ削除.
+  var _CBOX_EXECUTE_TYPE_REMOVE_FOLDER = "remove-folder";
+
+  // CBOX: 処理区分: ファイル作成・上書き.
+  var _CBOX_EXECUTE_TYPE_CREATE_FILE= "create-file";
+
+  // CBOX: 処理区分: ファイル取得.
+  var _CBOX_EXECUTE_TYPE_GET_FILE= "get-file";
+
+  // CBOX: 処理区分: ファイル削除.
+  var _CBOX_EXECUTE_TYPE_REMOVE_FILE= "remove-file";
+
+  // CBOX: 処理区分: リスト一覧.
+  var _CBOX_EXECUTE_TYPE_LIST= "list";
+
+  // CBOX: 処理区分: ファイル存在.
+  var _CBOX_EXECUTE_TYPE_IS_FILE= "is-file";
+
+  // CBOX: 処理区分: フォルダ存在.
+  var _CBOX_EXECUTE_TYPE_IS_FOLDER= "is-folder";
+
+  // CBOX: ロック状態を取得.
+  var _CBOX_EXECUTE_TYPE_IS_LOCK = "is-lock";
 
   // cboxフォルダが存在しない場合は作成する.
   if(!file.isDir(_CBOX_FOLDER)) {
@@ -59,6 +91,14 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
     if(url.indexOf("../") != -1) {
       http.errorFileResult(403,
         {message: "不正なURLを検知:" + url},
+        res,
+        closeFlag);
+      return false;
+    }
+    // 隠しファイルを指定されている場合は、処理しない.
+    if(url.indexOf("/.") != -1) {
+      http.errorFileResult(403,
+        {message: "隠しファイル、フォルダは禁止です:" + url},
         res,
         closeFlag);
       return false;
@@ -120,36 +160,6 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
     try {req.end();} catch(e) {}
     try {req.close();} catch(e) {}
   }
-
-  // CBOX: 処理区分.
-  var _CBOX_EXECUTE_TYPE = "x-cbox-execute-type";
-
-  // CBOX: 処理区分: フォルダ作成.
-  var _CBOX_EXECUTE_TYPE_CREATE_FOLDER = "create-folder";
-
-  // CBOX: 処理区分: フォルダ削除.
-  var _CBOX_EXECUTE_TYPE_REMOVE_FOLDER = "remove-folder";
-
-  // CBOX: 処理区分: ファイル作成・上書き.
-  var _CBOX_EXECUTE_TYPE_CREATE_FILE= "create-file";
-
-  // CBOX: 処理区分: ファイル取得.
-  var _CBOX_EXECUTE_TYPE_GET_FILE= "get-file";
-
-  // CBOX: 処理区分: ファイル削除.
-  var _CBOX_EXECUTE_TYPE_REMOVE_FILE= "remove-file";
-
-  // CBOX: 処理区分: リスト一覧.
-  var _CBOX_EXECUTE_TYPE_LIST= "list";
-
-  // CBOX: 処理区分: ファイル存在.
-  var _CBOX_EXECUTE_TYPE_IS_FILE= "is-file";
-
-  // CBOX: 処理区分: フォルダ存在.
-  var _CBOX_EXECUTE_TYPE_IS_FOLDER= "is-folder";
-
-  // CBOX: ロック状態を取得.
-  var _CBOX_EXECUTE_TYPE_IS_LOCK = "is-lock";
 
   // 環境コンフィグ情報をセット.
   o.setEnvConf = function(c) {
@@ -382,7 +392,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
             // 正常終了を返却.
             http.sendJson(res, null,
-              {result:"success", status: 200, message: "ファイルの作成に成功しました:" + url},
+              {result:"success", status: 200, message: "ファイルの作成に成功しました:" + url, newFile: oldFile == null},
               200,
               notCache, closeFlag);
           });
@@ -441,12 +451,12 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         if(!successFlag) {
           _errorLockTimeout(url, res, notCache, closeFlag);
           ret = false;
-        // URLが不正な場合.
-        } else if(!_topUrlCheck(url, res, closeFlag)) {
-          ret = false;
         // favicon.icoの場合は404 返却.
         } else if(url == _FAVICON_ICO) {
           http.sendFaviconIco(res, {}, closeFlag);
+          ret = false;
+        // URLが不正な場合.
+        } else if(!_topUrlCheck(url, res, closeFlag)) {
           ret = false;
         // ファイルが存在しない場合は404エラー.
         } else if(!file.isFile(name)) {
@@ -597,16 +607,20 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
           var len = list.length;
           for(var i = 0; i < len; i ++) {
             n = list[i];
+            // 隠しファイルは非表示.
+            if(n.indexOf(".") == 0) {
+              continue;
+            }
             stat = file.stat(name + "/" + n);
             if(stat == null) {
               continue;
             }
             ret.push({
-              name: name,                     // ファイル/フォルダ名
+              name: n,                        // ファイル/フォルダ名
               fileSize: stat.size,            // ファイルサイズ(byte)
               fileTime: stat.mtime.getTime(), // ファイルタイム(unixTime)
-              isFile: stat.isFile,            // ファイルの場合[true]
-              isDir: stat.isDir,              // フォルダの場合[true]
+              isFile: stat.isFile(),          // ファイルの場合[true]
+              isDir: stat.isDirectory(),      // フォルダの場合[true]
               isLock: psync.isLock(name)      // ロック状態.
             });
           }

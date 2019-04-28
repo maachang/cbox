@@ -1,0 +1,226 @@
+<!--
+  cbox api 利用例.
+   client/cbox.js
+   client/cbox.css
+   client/exsample.html
+   これら3つのファイルを、cboxサーバ起動して、cbox/client/に配置させる.
+   
+   cboxサーバを起動して、
+    http://127.0.0.1:3210/client/exsample.html
+   
+   をブラウザのURLに入れて、実行する.
+-->
+<!DOCTYPE HTML SYSTEM "about:legacy-compat">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja">
+<head>
+<meta charset="UTF-8" />
+
+<meta name="description" content="cbox 利用例.">
+<meta name="keywords" content="cbox の使い方、理解など.">
+<title>cbox exsample.</title>
+
+<meta http-equiv="content-type" content="application/xhtml+xml; charset=utf-8"/>
+<meta http-equiv="content-style-type" content="text/css; charset=utf-8" />
+<meta http-equiv="content-script-type" content="text/javascript; charset=utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+
+<script src="/client/cbox.js"></script>
+<link rel="stylesheet" href="/client/cbox.css" type="text/css">
+
+</head>
+<body style="background:#000000;color:#ffffff;">
+
+<script>
+
+// デフォルトURL.
+var DEF_URL = "http://" + location.host;
+
+// Elementに割り当てらてたIDでElementを取得.
+var $get = function(id) {
+  return document.getElementById(id);
+}
+
+// input value を削除.
+var clearInputValue = function(id) {
+  var em = $get(id);
+  if(em) {
+    em.value = "";
+  }
+}
+
+// URLを取得.
+var getUrl = function(id) {
+  var em = $get(id);
+  if(em) {
+    var v = em.value;
+    if(!v || v == "") {
+      alert("[" + id + "]のURLが設定されていません");
+      throw new Errro("no url error");
+    }
+    // 先頭のURLが不正な場合.
+    if(v.indexOf("/") != 0) {
+      v = "/" + v;
+    }
+    return DEF_URL + v;
+  } else {
+    alert("[" + id + "]のURLが設定されていません");
+    throw new Errro("no url error");
+  }
+}
+
+// 処理結果のコールバック.
+var resultCallback = function(status, result) {
+  alert("result(status:" + status + "): " + result);
+  return false;
+}
+
+// ファイルアップデート.
+var sendFileUpdate = function(id, url, result) {
+  var em = $get(id);
+  if(em.files.length <= 0) {
+    alert("[" + id + "] ファイルが指定されていません");
+    throw new Errro("no upload file error");
+  }
+  var files = em.files;
+  var file = files[0];
+
+  cbox.updateFile(url, file, result)
+}
+
+// データ取得.
+var getData = function(id) {
+  var em = $get(id);
+  if(em) {
+    var ret = em.value;
+    if(!ret) {
+      return "";
+    } else {
+      return "" + ret;
+    }
+  } else {
+    return "";
+  }
+}
+
+// 別のタブでURLを開く.
+var createTab = function(url) {
+  var childWindow = window.open('about:blank');
+  childWindow.location.href = url;
+  childWindow = null;
+}
+
+</script>
+
+<p>
+  http://domain の入力を省略すると、現在接続中のcboxにアクセスします.<br>
+  また、先頭の / を省略しても / が設定されます.
+</p>
+
+<br>
+
+<!-- createFolder -->
+<p>
+  フォルダ作成 :<br> 
+  URL: <input type="text" value="" id="createFolder" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('createFolder')">
+  &nbsp;<input type="button" value="clearFolder" class="base_button" onclick="cbox.createFolder(getUrl('createFolder'), resultCallback)">
+</p>
+
+<br>
+
+<!-- removeFolder -->
+<p>
+  フォルダ削除 : <br>
+  URL: <input type="text" value="" id="removeFolder" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('removeFolder')">
+  &nbsp;<input type="button" value="clearFolder" class="base_button" onclick="cbox.removeFolder(getUrl('removeFolder'), resultCallback)">
+</p>
+
+<br>
+
+<!-- updateFile -->
+<p>
+  ファイルアップデート : <br>
+  URL: <input type="text" value="" id="updateFolder" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateFolder');">
+  <br>送信ファイル設定 : <input type="file" value="" id="updateFile" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateFile');">
+  <br><input type="button" value="updateFile" class="base_button" onclick="sendFileUpdate('updateFile', getUrl('updateFolder'), resultCallback)">
+</p>
+
+<br>
+
+<!-- updateFile -->
+<p>
+  データアップデート : <br>
+  URL: <input type="text" value="" id="updateURL" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateURL');">
+  <br>送信ファイル設定 : <input type="text" value="" id="updateData" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateData');">
+  <br><input type="button" value="updateData" value="送信" class="base_button" onclick="cbox.updateData(getUrl('updateURL'), getData('updateData'), resultCallback)">
+</p>
+
+<br>
+
+<!-- getFile -->
+<p>
+  ファイル取得 : <br>
+  URL: <input type="text" value="" id="getFile" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('getFile')">
+  &nbsp;<input type="button" value="ファイルを取得" class="base_button" onclick="createTab(getUrl('getFile'))">
+</p>
+
+<br>
+
+<!-- removeFile -->
+<p>
+  ファイル削除 : <br>
+  URL: <input type="text" value="" id="removeFile" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('removeFile')">
+  &nbsp;<input type="button" value="ファイルを削除" class="base_button" onclick="cbox.removeFile(getUrl('removeFile'), resultCallback)">
+</p>
+
+<br>
+
+<!-- removeFile -->
+<p>
+  ファイルリスト取得 : <br>
+  URL: <input type="text" value="" id="getList" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('getList')">
+  &nbsp;<input type="button" value="リスト取得" class="base_button" onclick="cbox.getList(getUrl('getList'), resultCallback)">
+</p>
+
+<br>
+
+<!-- isFile -->
+<p>
+  ファイル存在チェック : <br>
+  URL: <input type="text" value="" id="isFile" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('isFile')">
+  &nbsp;<input type="button" value="ファイル存在" class="base_button" onclick="cbox.isFile(getUrl('isFile'), resultCallback)">
+</p>
+
+<br>
+
+<!-- isFile -->
+<p>
+  フォルダ存在チェック : <br>
+  URL: <input type="text" value="" id="isFolder" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('isFolder')">
+  &nbsp;<input type="button" value="フォルダ存在" class="base_button" onclick="cbox.isFolder(getUrl('isFolder'), resultCallback)">
+</p>
+
+<br>
+
+<!-- isFile -->
+<p>
+  ロック存在チェック : <br>
+  URL: <input type="text" value="" id="isLock" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('isLock')">
+  &nbsp;<input type="button" value="ロック存在" class="base_button" onclick="cbox.isLock(getUrl('isLock'), resultCallback)">
+</p>
+
+<br>
+
+</body>
+</html>
