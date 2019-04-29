@@ -84,34 +84,6 @@
   // argsCmdのヘルプ情報を破棄.
   argsCmd.destroy();
 
-  // コマンド実行起動ができるかチェック.
-  if (cmd != null) {
-    if(cmd == "cmd") {
-      // cmd終了時に安全に終了結果を送る.
-      var exitCode = 0;
-      process.on('exit', function() {
-        process.exit(exitCode);
-      });
-
-      if (argv_params.length > 3) {
-
-        // システム起動時のnanoTimeを取得.
-        var nanoTime = nums.getNanoTime();
-
-        // コマンド実行.
-        var cmdName = "" + argv_params[3];
-        var res = require("./cbox/cmd").create(cmdName, port, timeout, env, serverId, notCache, closeFlag, nanoTime)
-        if(!res) {
-          exitCode = 1;
-        }
-      } else {
-        console.log("指定コマンドが設定されていません");
-        exitCode = 1;
-      }
-      return;
-    }
-  }
-
   // systemNanoTimeを保持するファイル名.
   var _SYSTEM_NANO_TIME_FILE = "./.systemNanoTime";
 
@@ -127,12 +99,44 @@
     return parseInt(file.readByString(_SYSTEM_NANO_TIME_FILE));
   }
 
+  // コマンド実行起動ができるかチェック.
+  if (cmd != null) {
+    if(cmd == "cmd") {
+      // cmd終了時に安全に終了結果を送る.
+      var exitCode = 0;
+      process.on('exit', function() {
+        process.exit(exitCode);
+      });
+
+      if (argv_params.length > 3) {
+
+        // サーバの最後に起動した起動時間を取得.
+        var nanoTime = file.isFile(_SYSTEM_NANO_TIME_FILE) ?
+          _getSystemNanoTime() : nums.getNanoTime();
+
+        // コマンド実行.
+        var cmdName = "" + argv_params[3];
+        var res = require("./cbox/cmd").create(cmdName, port, timeout, env, serverId, notCache, closeFlag, nanoTime)
+        if(!res) {
+          exitCode = 1;
+        }
+      } else {
+        console.log("指定コマンドが設定されていません");
+        exitCode = 1;
+      }
+      return;
+    }
+  }
+
   // クラスタ起動.
   var cluster = require('cluster');
   if (cluster.isMaster) {
 
     // システム起動時のnanoTimeは、１度生成して、ファイル経由でcluster共有.
-    _createSystemNanoTime();
+    var nanoTime = _createSystemNanoTime();
+
+    // psync初期化.
+    require("./lib/psync")(nanoTime).init();
     
     // 起動時に表示する内容.
     constants.viewTitle(function(n){console.log(n);}, false);
@@ -144,16 +148,15 @@
     for (var i = 0; i < csize; ++i) {
       cluster.fork();
     }
+
+    // ワーカーが落ちた場合は再起動させる.
     cluster.on('exit', function (worker, code, signal) {
       console.debug("## cluster exit to reStart.")
       cluster.fork();
     });
   } else {
-
-    // システム起動時のnanoTimeを取得.
-    var nanoTime = _getSystemNanoTime();
     
     // ワーカー起動.
-    require("./cbox/index").create(port, timeout, env, serverId, notCache, closeFlag, nanoTime)
+    require("./cbox/index").create(port, timeout, env, serverId, notCache, closeFlag, _getSystemNanoTime())
   }
 })();

@@ -144,7 +144,14 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
   // トップフォルダ名を取得.
   var _topFolderName = function(name) {
-    return name.substring(1, name.indexOf("/", 1));
+    var p = name.indexOf("/");
+    if(p == 0) {
+      name = name.substring(1);
+      if((p = name.indexOf("/", 1)) == -1) {
+        return name;
+      }
+    }
+    return name.substring(0, p);
   }
 
   // ロックタイムアウトエラー.
