@@ -21,8 +21,8 @@
   // 数値情報.
   var nums = require("./lib/nums");
 
-  // システム開始nanoTimeを取得.
-  var systemNanoTime = nums.getNanoTime();
+  // ファイル.
+  var file = require("./lib/file");
 
   // サーバID.
   var serverId = serverId.getId();
@@ -92,10 +92,15 @@
       process.on('exit', function() {
         process.exit(exitCode);
       });
-      
+
       if (argv_params.length > 3) {
+
+        // システム起動時のnanoTimeを取得.
+        var nanoTime = nums.getNanoTime();
+
+        // コマンド実行.
         var cmdName = "" + argv_params[3];
-        var res = require("./cbox/cmd").create(cmdName, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime)
+        var res = require("./cbox/cmd").create(cmdName, port, timeout, env, serverId, notCache, closeFlag, nanoTime)
         if(!res) {
           exitCode = 1;
         }
@@ -107,9 +112,27 @@
     }
   }
 
+  // systemNanoTimeを保持するファイル名.
+  var _SYSTEM_NANO_TIME_FILE = "./.systemNanoTime";
+
+  // systemNanoTimeを生成.
+  var _createSystemNanoTime = function() {
+    var nano = nums.getNanoTime();
+    file.writeByString(_SYSTEM_NANO_TIME_FILE, ""+ nano);
+    return nano;
+  }
+
+  // systemNanoTimeを取得.
+  var _getSystemNanoTime = function() {
+    return parseInt(file.readByString(_SYSTEM_NANO_TIME_FILE));
+  }
+
   // クラスタ起動.
   var cluster = require('cluster');
   if (cluster.isMaster) {
+
+    // システム起動時のnanoTimeは、１度生成して、ファイル経由でcluster共有.
+    _createSystemNanoTime();
     
     // 起動時に表示する内容.
     constants.viewTitle(function(n){console.log(n);}, false);
@@ -126,8 +149,11 @@
       cluster.fork();
     });
   } else {
+
+    // システム起動時のnanoTimeを取得.
+    var nanoTime = _getSystemNanoTime();
     
     // ワーカー起動.
-    require("./cbox/index").create(port, timeout, env, serverId, notCache, closeFlag, systemNanoTime)
+    require("./cbox/index").create(port, timeout, env, serverId, notCache, closeFlag, nanoTime)
   }
 })();

@@ -122,7 +122,7 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         memory.cbox = Object.freeze({"readLock": cbox.readLock, "writeLock": cbox.writeLock});
         cbox = null;
       
-        // 実行処理.
+        // 実行処理. 
         var script = new vm.Script(srcScript);
         srcScript = null;
         script.runInContext(context);

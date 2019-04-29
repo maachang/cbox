@@ -23,7 +23,7 @@ module.exports.create = function(port, timeout, env, serverId, notCache, closeFl
   });
 
   // promise例外ハンドラ.
-  process.on('unhandledRejection', (reason) => {
+  process.on('unhandledRejection', function(reason) {
     console.trace(reason, reason);
   });
 
