@@ -25,6 +25,9 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
 
 <script src="/client/cbox.js"></script>
+<!--
+  <script src="/client/cbox-min.js"></script>
+-->
 <link rel="stylesheet" href="/client/cbox.css" type="text/css">
 
 </head>
@@ -32,8 +35,8 @@
 
 <script>
 
-// デフォルトURL.
-var DEF_URL = "http://" + location.host;
+// デフォルトURLヘッド(http://domain).
+var DEF_HEAD_URL = location.protocol + "://" + location.host;
 
 // Elementに割り当てらてたIDでElementを取得.
 var $get = function(id) {
@@ -57,11 +60,15 @@ var getUrl = function(id) {
       alert("[" + id + "]のURLが設定されていません");
       throw new Errro("no url error");
     }
+    // URLがフルパスの場合はそのまま.
+    if(v.indexOf("http://") == 0 || v.indexOf("https://") == 0) {
+      return v;
+    }
     // 先頭のURLが不正な場合.
     if(v.indexOf("/") != 0) {
       v = "/" + v;
     }
-    return DEF_URL + v;
+    return DEF_HEAD_URL + v;
   } else {
     alert("[" + id + "]のURLが設定されていません");
     throw new Errro("no url error");

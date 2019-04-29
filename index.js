@@ -55,6 +55,7 @@
       constants.viewTitle(console.log, false);
       console.log("");
       console.log("   [help] ヘルプコマンドです.")
+      console.log("   [cmd] [コマンド名.jsファイル] コマンド名を実行します.")
       console.log("   [serverId] サーバIDを更新します.")
       console.log("   [version] バージョン情報を表示します.")
       console.log("   [--version] バージョン情報だけを表示します.")
@@ -72,6 +73,8 @@
     } else if (cmd == "version") {
       constants.viewTitle(console.log, false);
       return;
+    
+    // バージョン番号のみを表示.
     } else if (cmd == "--version") {
       console.log(constants.VERSION);
       return;
@@ -80,6 +83,29 @@
   
   // argsCmdのヘルプ情報を破棄.
   argsCmd.destroy();
+
+  // コマンド実行起動ができるかチェック.
+  if (cmd != null) {
+    if(cmd == "cmd") {
+      // cmd終了時に安全に終了結果を送る.
+      var exitCode = 0;
+      process.on('exit', function() {
+        process.exit(exitCode);
+      });
+      
+      if (argv_params.length > 3) {
+        var cmdName = "" + argv_params[3];
+        var res = require("./cbox/cmd").create(cmdName, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime)
+        if(!res) {
+          exitCode = 1;
+        }
+      } else {
+        console.log("指定コマンドが設定されていません");
+        exitCode = 1;
+      }
+      return;
+    }
+  }
 
   // クラスタ起動.
   var cluster = require('cluster');

@@ -8,6 +8,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
   var fs = require("fs");
   var file = require("../lib/file");
+  var nums = require("../lib/nums");
   var http = require("./http");
   var psync = require("../lib/psync")(systemNanoTime);
   var uniqueId = require("../lib/uniqueId");
@@ -17,9 +18,6 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
   // テンポラリファイルのunique数.
   var _TMP_UNIQUE_LENGTH = 48;
-
-  // ロックタイムアウト(5秒).
-  var _LOCK_TIMEOUT = 5000;
 
   // テンポラリファイルの拡張子.
   var _TMP_EXTENSION = ".tmp";
@@ -34,9 +32,12 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   // cbox 書き込み許可シグニチャ.
   var _CBOX_WRITE_SIGNATURES = "x-cbox-write-signatures"
 
+  // cbox: 処理タイムアウト.
+  var _CBOX_EXECUTE_TIMEOUT = "x-cbox-execute-timeout";
 
   // CBOX: 処理区分.
   var _CBOX_EXECUTE_TYPE = "x-cbox-execute-type";
+
 
   // CBOX: 処理区分: フォルダ作成.
   var _CBOX_EXECUTE_TYPE_CREATE_FOLDER = "create-folder";
@@ -176,9 +177,11 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
     try {
       var ret = true;
       var executeType = req.headers[_CBOX_EXECUTE_TYPE];
+      var lockTimeout = req.headers[_CBOX_EXECUTE_TIMEOUT];
       var method = req.method.toLowerCase();
       var url = _getUrl(req);
       var name = _CBOX_FOLDER + url;
+      var topName = _topFolderName(url);
 
       // URL不正チェック.
       if(!_checkUrl(url, res, closeFlag)) {
@@ -187,9 +190,9 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
       // methodで処理を分ける.
       } else if(method == "post") {
 
-        // ファイル作成・更新処理.
+        // [書き込み系処理]ファイル作成・更新処理.
         if(executeType == _CBOX_EXECUTE_TYPE_CREATE_FILE) {
-          return this.createFile(name, url, req, res);
+          return this.createFile(name, topName, url, req, res, lockTimeout);
         }
 
         // エラー返却.
@@ -201,30 +204,38 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } else if(method == "get") {
 
-        // 各処理.
+        // 書き込み系処理.
         switch(executeType) {
           case _CBOX_EXECUTE_TYPE_CREATE_FOLDER:
-            return this.createFolder(name, url, req, res);
+            return this.createFolder(name, topName, url, req, res, lockTimeout);
           case _CBOX_EXECUTE_TYPE_REMOVE_FOLDER:
-            return this.removeFolder(name, url, req, res);
+            return this.removeFolder(name, topName, url, req, res, lockTimeout);
           case _CBOX_EXECUTE_TYPE_REMOVE_FILE:
-            return this.removeFile(name, url, req, res);
+            return this.removeFile(name, topName, url, req, res, lockTimeout);
+        }
+
+        // 読み込み系処理.
+        switch(executeType) {
           case _CBOX_EXECUTE_TYPE_LIST:
-            return this.list(name, url, req, res);
+            return this.list(name, topName, url, req, res, lockTimeout);
           case _CBOX_EXECUTE_TYPE_IS_FILE:
-            return this.isFile(name, url, req, res);
+            return this.isFile(name, topName, url, req, res, lockTimeout);
           case _CBOX_EXECUTE_TYPE_IS_FOLDER:
-            return this.isFolder(name, url, req, res);
+            return this.isFolder(name, topName, url, req, res, lockTimeout);
           case _CBOX_EXECUTE_TYPE_IS_LOCK:
-            return this.isLock(name, url, req, res);
+            return this.isLock(name, topName, url, req, res, lockTimeout);
           
-          // GETファイル指定、もしくは指定なしは[getFile処理]
+          // GETファイル指定、もしくは指定なし [getFile処理]
           case _CBOX_EXECUTE_TYPE_GET_FILE:
           case "":
           case undefined:
-            return this.getFile(name, url, req, res);
+          case null:
+            return this.getFile(name, topName, url, req, res, lockTimeout);
         }
       }
+
+
+
       // エラー返却.
       http.errorFileResult(500,
         {message: "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url},
@@ -248,9 +259,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // 指定フォルダ作成.
-  o.createFolder = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.createFolder = function(name, topName, url, req, res, lockTimeout) {
+    psync.lock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -276,7 +286,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } finally {
         // アンロック.
-        psync.unlock(topName);
+        psync.unLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -287,9 +297,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // 指定フォルダ削除.
-  o.removeFolder = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.removeFolder = function(name, topName, url, req, res, lockTimeout) {
+    psync.lock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -315,7 +324,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } finally {
         // アンロック.
-        psync.unlock(topName);
+        psync.unLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -326,9 +335,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // ファイルの作成、上書き.
-  o.createFile = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.createFile = function(name, topName, url, req, res, lockTimeout) {
+    psync.lock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -388,7 +396,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
             }
 
             // アンロック.
-            psync.unlock(topName);
+            psync.unLock(topName);
 
             // 正常終了を返却.
             http.sendJson(res, null,
@@ -415,7 +423,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
             }
 
             // アンロック.
-            psync.unlock(topName);
+            psync.unLock(topName);
           
             // エラー返却.
             http.errorFileResult(500, err, res, closeFlag);
@@ -431,7 +439,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
       } finally {
 
         // アンロック.
-        psync.unlock(topName);
+        psync.unLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -442,9 +450,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // ファイルの取得.
-  o.getFile = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.getFile = function(name, topName, url, req, res, lockTimeout) {
+    psync.readLock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -503,14 +510,14 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
                 res.end();
 
                 // アンロック.
-                psync.readUnlock(topName);
+                psync.readUnLock(topName);
               });
               rs.on("error", function(err) {
                 try { res.end(); } catch(e) {}
                 try { rs.close(); } catch(e) {}
 
                 // アンロック.
-                psync.readUnlock(topName);
+                psync.readUnLock(topName);
 
                 // リクエストを閉じる.
                 _closeReq(req);
@@ -528,7 +535,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } finally {
         // アンロック.
-        psync.readUnlock(topName);
+        psync.readUnLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -539,9 +546,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // 指定ファイルの削除.
-  o.removeFile = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.lock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.removeFile = function(name, topName, url, req, res, lockTimeout) {
+    psync.lock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -570,7 +576,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } finally {
         // アンロック.
-        psync.unlock(topName);
+        psync.unLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -581,9 +587,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // 対象フォルダ配下のファイル・フォルダ一覧を取得.
-  o.list = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.list = function(name, topName, url, req, res, lockTimeout) {
+    psync.readLock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -627,7 +632,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
           // 処理結果返却.
           http.sendJson(res, null,
-            {result:"success", status: 200, message: "リスト取得に成功しました:" + url, value: ret},
+            {result:"success", status: 200, message: "リスト取得に成功しました:" + url, parent: url, value: ret},
             200,
             notCache, closeFlag);
         }
@@ -636,7 +641,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } finally {
         // アンロック.
-        psync.readUnlock(topName);
+        psync.readUnLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -647,9 +652,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // 指定ファイルが存在するかチェック.
-  o.isFile = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.isFile = function(name, topName, url, req, res, lockTimeout) {
+    psync.readLock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -671,7 +675,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } finally {
         // アンロック.
-        psync.readUnlock(topName);
+        psync.readUnLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -682,9 +686,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // 指定フォルダが存在するかチェック.
-  o.isFolder = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.isFolder = function(name, topName, url, req, res, lockTimeout) {
+    psync.readLock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -703,7 +706,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } finally {
         // アンロック.
-        psync.readUnlock(topName);
+        psync.readUnLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -715,9 +718,8 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
   // 対象フォルダ・ファイルはロックされているかチェック.
   // 先頭フォルダ名で読み込み、書き込みロックを行います.
-  o.isLock = function(name, url, req, res) {
-    var topName = _topFolderName(url);
-    psync.readLock(topName, _LOCK_TIMEOUT, function(successFlag) {
+  o.isLock = function(name, topName, url, req, res, lockTimeout) {
+    psync.readLock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       try {
         // ロックタイムアウト.
@@ -736,7 +738,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } finally {
         // アンロック.
-        psync.readUnlock(topName);
+        psync.readUnLock(topName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -744,6 +746,20 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
       }
       return ret;
     });
+  }
+
+  // [非同期] ロック処理で保護.
+  // [call実行引数] 処理結果 [true=success] は第一引数に指定されます.
+  // [call実行引数] ロック解除のメソッドは第二引数に設定されます.
+  o.writeLock = function(url, lockTimeout, call, errorCall) {
+    psync.async.lock(url, lockTimeout, call, errorCall);
+  }
+
+  // [非同期] 読み込みロック処理で保護.
+  // [call実行引数] 処理結果 [true=success] は第一引数に指定されます.
+  // [call実行引数] ロック解除のメソッドは第二引数に設定されます.
+  o.readLock = function(url, lockTimeout, call, errorCall) {
+    psync.async.readLock(url, lockTimeout, call, errorCall);
   }
 
   return o;

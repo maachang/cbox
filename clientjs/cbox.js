@@ -352,6 +352,28 @@ if(!window["global"]) {
     return "application/octet-stream";
   }
 
+  // デフォルトURLヘッド(http://domain).
+  var DEF_HEAD_URL = location.protocol + "://" + location.host;
+
+  // URLを取得.
+  var _getUrl = function(url, head) {
+    if(!url || url == "") {
+      return null;
+    }
+    // URLがフルパスの場合はそのまま.
+    if(url.indexOf("http://") == 0 || url.indexOf("https://") == 0) {
+      return url;
+    }
+    // 先頭のURLが不正な場合.
+    if(url.indexOf("/") != 0) {
+      url = "/" + url;
+    }
+    // http://domain が指定されていない場合は、現在のURLをセット.
+    if(!head || head == "") {
+      return DEF_HEAD_URL + url;
+    }
+  }
+
   // cbox 書き込み許可シグニチャ.
   var _CBOX_WRITE_SIGNATURES = "X-Cbox-Write-Signatures"
 
@@ -390,6 +412,10 @@ if(!window["global"]) {
 
   // POSTデータ用送信.
   var _sendPost =  function(url, execType, header, value, noCache, result, errorResult) {
+    
+    // URLの整形.
+    url = _getUrl(url);
+
     // urlのmimeタイプを取得.
     var mimeType = _mimeType(url);
 
@@ -410,6 +436,10 @@ if(!window["global"]) {
   // postファイルアップロード用送信.
   // urlはフォルダまで.
   var _sendUploadPost = function(url, execType, header, value, noCache, result, errorResult) {
+
+    // URLの整形.
+    url = _getUrl(url);
+
     // フォルダ名に対して、ファイルアップロードファイル名をセット.
     if(url.lastIndexOf("/") == url.length - 1) {
       url += value.name;
@@ -434,6 +464,10 @@ if(!window["global"]) {
 
   // get送信.
   var _sendGet = function(url, execType, header, params, noCache, result, errorResult) {
+
+    // URLの整形.
+    url = _getUrl(url);
+
     // キャッシュが設定されていない場合.
     if(!noCache) {
       noCache = _DEF_NO_CACHE;

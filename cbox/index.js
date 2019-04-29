@@ -19,12 +19,12 @@ module.exports.create = function(port, timeout, env, serverId, notCache, closeFl
 
   // プロセス例外ハンドラ.
   process.on('uncaughtException', function(e) {
-    console.trace(e);
+    console.trace(e, e);
   });
 
   // promise例外ハンドラ.
   process.on('unhandledRejection', (reason) => {
-    console.trace(reason);
+    console.trace(reason, reason);
   });
 
   // cbox処理を生成.
