@@ -241,8 +241,6 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         }
       }
 
-
-
       // エラー返却.
       http.errorFileResult(500,
         {message: "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url},

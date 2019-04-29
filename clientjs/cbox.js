@@ -380,6 +380,9 @@ if(!window["global"]) {
   // 実行命令ヘッダ.
   var _CBOX_EXECUTE_TYPE = "X-Cbox-Execute-Type";
 
+  // cbox: 処理タイムアウト.
+  var _CBOX_EXECUTE_TIMEOUT = "X-Cbox-Execute-Timeout";
+
   // CBOX: 処理区分: フォルダ作成.
   var _CBOX_EXECUTE_TYPE_CREATE_FOLDER = "create-folder";
 
@@ -411,7 +414,7 @@ if(!window["global"]) {
   var _DEF_NO_CACHE = true;
 
   // POSTデータ用送信.
-  var _sendPost =  function(url, execType, header, value, noCache, result, errorResult) {
+  var _sendPost =  function(url, execType, header, value, noCache, timeout, result, errorResult) {
     
     // URLの整形.
     url = _getUrl(url);
@@ -426,6 +429,7 @@ if(!window["global"]) {
 
     // 実行命令をセット.
     header[_CBOX_EXECUTE_TYPE] = execType;
+    header[_CBOX_EXECUTE_TIMEOUT] = (!timeout) ? "" : "" + timeout;
 
     // ヘッダ情報をセット.
     header['Content-Type'] = mimeType;
@@ -435,7 +439,7 @@ if(!window["global"]) {
 
   // postファイルアップロード用送信.
   // urlはフォルダまで.
-  var _sendUploadPost = function(url, execType, header, value, noCache, result, errorResult) {
+  var _sendUploadPost = function(url, execType, header, value, noCache, timeout, result, errorResult) {
 
     // URLの整形.
     url = _getUrl(url);
@@ -454,7 +458,8 @@ if(!window["global"]) {
     
     // 実行命令をセット.
     header[_CBOX_EXECUTE_TYPE] = execType;
-
+    header[_CBOX_EXECUTE_TIMEOUT] = (!timeout) ? "" : "" + timeout;
+    
     // valueは基本fileアップロードしたものを、情報として処理するようにする.
     // value.file = ファイル情報.
     header['Content-Type'] = value.type;
@@ -463,7 +468,7 @@ if(!window["global"]) {
   }
 
   // get送信.
-  var _sendGet = function(url, execType, header, params, noCache, result, errorResult) {
+  var _sendGet = function(url, execType, header, params, noCache, timeout, result, errorResult) {
 
     // URLの整形.
     url = _getUrl(url);
@@ -474,6 +479,7 @@ if(!window["global"]) {
     }
 
     header[_CBOX_EXECUTE_TYPE] = execType;
+    header[_CBOX_EXECUTE_TIMEOUT] = (!timeout) ? "" : "" + timeout;
     _ajax("GET", url, params, result, errorResult, noCache, header);
   }
 
@@ -481,62 +487,62 @@ if(!window["global"]) {
   var o = {};
 
   // フォルダ作成.
-  o.createFolder = function(url, result, errorResult, noCache) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_CREATE_FOLDER, {}, null, noCache, result, errorResult);
+  o.createFolder = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_CREATE_FOLDER, {}, null, noCache, timeout, result, errorResult);
   }
 
   // フォルダ削除.
   // フォルダ配下は全削除します.
-  o.removeFolder = function(url, result, errorResult, noCache) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_REMOVE_FOLDER, {}, null, noCache, result, errorResult);
+  o.removeFolder = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_REMOVE_FOLDER, {}, null, noCache, timeout, result, errorResult);
   }
   
   // [HTML5のFileオブジェクト]を使ってファイルアップロードでファイル登録・更新.
   // urlはフォルダまで.
-  o.updateFile = function(url, value, result, errorResult, noCache) {
-    _sendUploadPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, {}, value, noCache, result, errorResult);
+  o.updateFile = function(url, value, result, errorResult, noCache, timeout) {
+    _sendUploadPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, {}, value, noCache, timeout, result, errorResult);
   }
 
   // データアップロードでファイル登録・更新.
   // url の拡張子でmimeTypeの設定が可能.
-  o.updateData = function(url, value, result, errorResult, noCache) {
-    _sendPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, {}, value, noCache, result, errorResult);
+  o.updateData = function(url, value, result, errorResult, noCache, timeout) {
+    _sendPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, {}, value, noCache, timeout, result, errorResult);
   }
 
   // ファイル取得.
-  o.getFile = function(url, result, errorResult, noCache) {
+  o.getFile = function(url, result, errorResult, noCache, timeout) {
     // キャッシュが設定されていない場合.
     if(!noCache) {
       
       // getFileの場合のみ、キャッシュ条件が設定されていない場合[キャッシュなし]で処理する.
       noCache = false;
     }
-    _sendGet(url, _CBOX_EXECUTE_TYPE_GET_FILE, {}, null, noCache, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_GET_FILE, {}, null, noCache, timeout, result, errorResult);
   }
 
   // ファイル削除.
-  o.removeFile = function(url, result, errorResult, noCache) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_REMOVE_FILE, {}, null, noCache, result, errorResult);
+  o.removeFile = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_REMOVE_FILE, {}, null, noCache, timeout, result, errorResult);
   }
 
   // フォルダ配下のリスト一覧取得.
-  o.getList = function(url, result, errorResult, noCache) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_LIST, {}, null, noCache, result, errorResult);
+  o.getList = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_LIST, {}, null, noCache, timeout, result, errorResult);
   }
 
   // 指定ファイルが存在するかチェック.
-  o.isFile = function(url, result, errorResult, noCache) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FILE, {}, null, noCache, result, errorResult);
+  o.isFile = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FILE, {}, null, noCache, timeout, result, errorResult);
   }
 
   // 指定フォルダが存在するかチェック.
-  o.isFolder = function(url, result, errorResult, noCache) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FOLDER, {}, null, noCache, result, errorResult);
+  o.isFolder = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FOLDER, {}, null, noCache, timeout, result, errorResult);
   }
 
   // 指定ファイル・フォルダのロック状態を取得.
-  o.isLock = function(url, result, errorResult, noCache) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_LOCK, {}, null, noCache, result, errorResult);
+  o.isLock = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_LOCK, {}, null, noCache, timeout, result, errorResult);
   }
 
   _g.cbox = o;
