@@ -410,6 +410,9 @@ if(!window["global"]) {
   // CBOX: ロック状態を取得.
   var _CBOX_EXECUTE_TYPE_IS_LOCK = "is-lock";
 
+  // CBOX: 強制ロック会場.
+  var _CBOX_EXECUTE_TYPE_FORCED_LOCK = "forced-lock";
+
   // デフォルト非キャッシュ： キャッシュなし.
   var _DEF_NO_CACHE = true;
 
@@ -543,6 +546,11 @@ if(!window["global"]) {
   // 指定ファイル・フォルダのロック状態を取得.
   o.isLock = function(url, result, errorResult, noCache, timeout) {
     _sendGet(url, _CBOX_EXECUTE_TYPE_IS_LOCK, {}, null, noCache, timeout, result, errorResult);
+  }
+
+  // 指定ファイル・フォルダのロック状態を取得.
+  o.forcedLock = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_FORCED_LOCK, {}, null, noCache, timeout, result, errorResult);
   }
 
   _g.cbox = o;

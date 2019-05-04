@@ -43,6 +43,9 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         out[_globalList[i]] = global[_globalList[i]];
       }
 
+      // requireは直接セットが必要.
+      out["require"] = require;
+
       // 標準セット.
       //out["global"] = global
       out["global"] = out;
@@ -121,6 +124,12 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         var cbox = require("./cbox").create(notCache, closeFlag, systemNanoTime);
         memory.cbox = Object.freeze({"readLock": cbox.readLock, "writeLock": cbox.writeLock});
         cbox = null;
+
+        // サーバID.
+        memory.serverId = Object.freeze(serverId);
+
+        // 実行環境名.
+        memory.env = Object.freeze(env);
       
         // 実行処理. 
         var script = new vm.Script(srcScript);

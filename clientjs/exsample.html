@@ -24,10 +24,9 @@
 <meta http-equiv="content-script-type" content="text/javascript; charset=utf-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
 
+<script src="/client/fcipher.js"></script>
 <script src="/client/cbox.js"></script>
-<!--
-  <script src="/client/cbox-min.js"></script>
--->
+
 <link rel="stylesheet" href="/client/cbox.css" type="text/css">
 
 </head>
@@ -228,6 +227,16 @@ var createTab = function(url) {
 </p>
 
 <br>
+
+<!-- isFile -->
+<p>
+    ロック強制解除チェック : <br>
+    URL: <input type="text" value="" id="forcedLock" class="base_input_text" max="512" size="50">
+    &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('forcedLock')">
+    &nbsp;<input type="button" value="ロック解除" class="base_button" onclick="cbox.forcedLock(getUrl('forcedLock'), resultCallback)">
+  </p>
+  
+  <br>
 
 </body>
 </html>
