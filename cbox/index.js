@@ -13,7 +13,7 @@ module.exports.create = function(port, timeout, env, serverId, notCache, closeFl
   var createHttp = function () {
     return http.createServer(function (req, res) {
       // cboxを実行.
-      cbox.executeCbox(req, res);
+      cbox.execute(req, res);
     })
   }
 
@@ -28,7 +28,8 @@ module.exports.create = function(port, timeout, env, serverId, notCache, closeFl
   });
 
   // cbox処理を生成.
-  var cbox = require("./cbox").create(sysParams.isNotCache(), sysParams.isCloseFlag(), sysParams.getSystemNanoTime());
+  var cbox = require("./cbox").create(
+    sysParams.isNotCache(), sysParams.isCloseFlag(), sysParams.getServerId(), sysParams.getSystemNanoTime());
 
   // cboxに対して現在の実行環境コンフィグをセット.
   cbox.setEnvConf(sysParams.getEnvConf())

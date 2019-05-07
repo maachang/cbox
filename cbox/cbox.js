@@ -2,7 +2,7 @@
 //
 //
 
-module.exports.create = function(notCache, closeFlag, systemNanoTime) {
+module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) {
   'use strict';
   var o = {};
 
@@ -11,6 +11,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   var http = require("./http");
   var psync = require("../lib/psync")(systemNanoTime);
   var uniqueId = require("../lib/uniqueId");
+  var uaccess = require("./uaccess").create(notCache, closeFlag, serverId, systemNanoTime);
 
   // コンフィグ(実行環境用)
   var envConf = null;
@@ -108,13 +109,16 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
   // URLにTOPフォルダにファイルを指定している場合はエラー返却.
   // ファイルのI/Oに対して有効.
-  var _topUrlCheck = function(url, res, closeFlag) {
+  var _topUrlCheck = function(url, res, closeFlag, noError) {
+    noError = noError == true;
     var p = url.indexOf("/", 1);
     if(p == -1 || p + 1 == url.length) {
-      http.errorFileResult(403,
-        {message: "ルートフォルダにファイルは設定できません:" + url},
-        res,
-        closeFlag);
+      if(!noError) {
+        http.errorFileResult(403,
+          {message: "ルートフォルダにファイルは設定できません:" + url},
+          res,
+          closeFlag);
+      }
       return false;
     }
     return true;
@@ -179,7 +183,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
   }
 
   // cbox処理.
-  o.executeCbox = function(req, res) {
+  o.execute = function(req, res) {
     try {
       var ret = true;
       var executeType = req.headers[_CBOX_EXECUTE_TYPE];
@@ -208,47 +212,68 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         ret = false;
       } else if(method == "get") {
 
-        // 書き込み系処理.
-        switch(executeType) {
-          case _CBOX_EXECUTE_TYPE_CREATE_FOLDER:
-            return this.createFolder(req, res, lockTimeout);
-          case _CBOX_EXECUTE_TYPE_REMOVE_FOLDER:
-            return this.removeFolder(req, res, lockTimeout);
-          case _CBOX_EXECUTE_TYPE_REMOVE_FILE:
-            return this.removeFile(req, res, lockTimeout);
-          case _CBOX_EXECUTE_TYPE_FORCED_LOCK:
-          return this.forcedLock(req, res);
+        // uaccessの実行条件の場合.
+        if(uaccess.isExecute(req)) {
+          return uaccess.execute(req, res);
         }
 
-        // 読み込み系処理.
-        switch(executeType) {
-          case _CBOX_EXECUTE_TYPE_LIST:
-            return this.list(req, res, lockTimeout);
-          case _CBOX_EXECUTE_TYPE_IS_FILE:
-            return this.isFile(req, res, lockTimeout);
-          case _CBOX_EXECUTE_TYPE_IS_FOLDER:
-            return this.isFolder(req, res, lockTimeout);
-          case _CBOX_EXECUTE_TYPE_IS_LOCK:
-            return this.isLock(req, res, lockTimeout);
-          
-          // GETファイル指定、もしくは指定なし [getFile処理]
-          case _CBOX_EXECUTE_TYPE_GET_FILE:
-          case "":
-          case undefined:
-          case null:
-            return this.getFile(req, res, lockTimeout);
+        // executeTypeが空の場合は、ファイル取得で処理.
+        if(executeType ==  "" || executeType == undefined || executeType == null) {
+          executeType = _CBOX_EXECUTE_TYPE_GET_FILE;
         }
+
+        // ファイル取得のみ[uaccessアカウント認証無し]で処理する.
+        // GETファイル指定、もしくは指定なし [getFile処理]
+        if(_CBOX_EXECUTE_TYPE_GET_FILE == executeType) {
+          return this.getFile(req, res, lockTimeout);
+        }
+
+        // uaccessアカウント認証ありで処理する.
+        uaccess.authAccount(req, function(result) {
+          if(result == false) {
+            // エラー返却.
+            http.errorFileResult(500,
+              {message: "cboxの処理タイプ " + executeType + " のアクセスには認証が必要です"},
+              res,
+              closeFlag);
+            return false;
+          }
+
+          // 書き込み系処理.
+          switch(executeType) {
+            case _CBOX_EXECUTE_TYPE_CREATE_FOLDER:
+              return o.createFolder(req, res, lockTimeout);
+            case _CBOX_EXECUTE_TYPE_REMOVE_FOLDER:
+              return o.removeFolder(req, res, lockTimeout);
+            case _CBOX_EXECUTE_TYPE_REMOVE_FILE:
+              return o.removeFile(req, res, lockTimeout);
+            case _CBOX_EXECUTE_TYPE_FORCED_LOCK:
+            return o.forcedLock(req, res);
+          }
+
+          // 読み込み系処理.
+          switch(executeType) {
+            case _CBOX_EXECUTE_TYPE_LIST:
+              return o.list(req, res, lockTimeout);
+            case _CBOX_EXECUTE_TYPE_IS_FILE:
+              return o.isFile(req, res, lockTimeout);
+            case _CBOX_EXECUTE_TYPE_IS_FOLDER:
+              return o.isFolder(req, res, lockTimeout);
+            case _CBOX_EXECUTE_TYPE_IS_LOCK:
+              return o.isLock(req, res, lockTimeout);
+          }
+
+          // エラー返却.
+          http.errorFileResult(500,
+            {message: "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url},
+            res,
+            closeFlag);
+
+          return false;
+        }, null, lockTimeout);
       }
 
-      // エラー返却.
-      http.errorFileResult(500,
-        {message: "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url},
-        res,
-        closeFlag);
-
-      ret = false;
       return ret;
-    
     } catch(error) {
       http.errorFileResult(500, error, res, closeFlag);
 
@@ -351,6 +376,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
     var topName = _topFolderName(url);
     psync.lock(topName, lockTimeout, function(successFlag) {
       var ret = true;
+      var notUnlock = false;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
@@ -389,6 +415,9 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
           // データ書き込み先.
           var out = fs.createWriteStream(name);
+
+          // アンロックは、データ受信後に行う.
+          notUnlock = true;
 
           // データ書き込み中.
           req.on("data", function (chunk) {
@@ -451,8 +480,10 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         var ret = false;
       } finally {
 
-        // アンロック.
-        psync.unLock(topName);
+        // アンロックが必要な場合は解除.
+        if(!notUnlock) {
+          psync.unLock(topName);
+        }
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -469,6 +500,7 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
     var topName = _topFolderName(url);
     psync.readLock(topName, lockTimeout, function(successFlag) {
       var ret = true;
+      var notUnlock = false;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
@@ -479,8 +511,13 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
           http.sendFaviconIco(res, {}, closeFlag);
           ret = false;
         // URLが不正な場合.
-        } else if(!_topUrlCheck(url, res, closeFlag)) {
-          ret = false;
+        } else if(!_topUrlCheck(url, res, closeFlag, true)) {
+          // 空のデータ送信.
+          var headers = {};
+          headers['Content-Type'] = "text/plain; charset=utf-8;";
+          http.setCrosHeader(headers, 0, notCache, closeFlag);
+          res.writeHead(200, headers);
+          res.end("");
         // ファイルが存在しない場合は404エラー.
         } else if(!file.isFile(name)) {
           http.errorFileResult(404,
@@ -519,6 +556,10 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
 
               // ファイルの返信は「生データ」を返却.
               var rs = fs.createReadStream(name);
+
+              // アンロックは、データ返信後に行う.
+              notUnlock = true;
+
               rs.on('data', function (data) {
                 res.write(data);
               });
@@ -550,8 +591,10 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
         http.errorFileResult(500, e, res, closeFlag);
         ret = false;
       } finally {
-        // アンロック.
-        psync.readUnLock(topName);
+        // アンロックが必要な場合は解除.
+        if(!notUnlock) {
+          psync.readUnLock(topName);
+        }
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -800,12 +843,6 @@ module.exports.create = function(notCache, closeFlag, systemNanoTime) {
     }
     return ret;
   }
-
-  // ユーザ認証・管理関連.
-  var uaccess = {};
-  o.uaccess = uaccess;
-
-
 
   return o;
 }

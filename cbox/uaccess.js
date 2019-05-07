@@ -764,6 +764,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
       // アンロック後に行う.
       _execCall(ret, call, errorCall);
       call = null; errorCall = null;
+      return ret;
     });
   }
 
@@ -1161,8 +1162,40 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
     }, null, lockTimeout);
   }
 
-  // cbox処理.
-  o.executeCbox = function(req, res) {
+  // httpアクセスからの、uaccess実行確認.
+  o.isExecute = function(req) {
+    try {
+      var executeType = req.headers[_UACCESS_TYPE];
+      var lockTimeout = req.headers[_UACCESS_TIMEOUT];
+      var method = req.method.toLowerCase();
+
+      if(executeType && lockTimeout && method == "get") {
+        // 実行処理.
+        switch(executeType) {
+          case _UACCESS_TYPE_CREATE_ADMIN_CODE:
+          case _UACCESS_TYPE_REMOVE_ADMIN_CODE:
+          case _UACCESS_TYPE_GET_LIST_ADMIN_CODE:
+          case _UACCESS_TYPE_GET_ADMIN_CODE:
+          case _UACCESS_TYPE_REMOVE_OLD_ADMIN_CODE:
+          case _UACCESS_TYPE_CREATE_SECURITY_CODE:
+          case _UACCESS_TYPE_REMOVE_SECURITY_CODE:
+          case _UACCESS_TYPE_GET_LIST_SECURITY_CODE:
+          case _UACCESS_TYPE_GET_SECURITY_CODE:
+          case _UACCESS_TYPE_REMOVE_OLD_SECURITY_CODE:
+          case _UACCESS_TYPE_CREATE_ACCOUNT_CODE:
+          case _UACCESS_TYPE_REMOVE_ACCOUNT_CODE:
+          case _UACCESS_TYPE_GET_ACCOUNT_CODE:
+          case _UACCESS_TYPE_LIST_ACCOUNT_CODE:
+          case _UACCESS_TYPE_IS_ACCOUNT_CODE:
+            return true;
+        }
+      }
+    } catch(e) {}
+    return false;
+  }
+
+  // httpアクセスからの、uaccess実行.
+  o.execute = function(req, res) {
     try {
       var executeType = req.headers[_UACCESS_TYPE];
       var lockTimeout = req.headers[_UACCESS_TIMEOUT];
@@ -1213,4 +1246,5 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
     }
   }
   
+  return o;
 };
