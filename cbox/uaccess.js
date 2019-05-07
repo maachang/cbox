@@ -504,15 +504,15 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
     return false;
   }
 
-  // ユーザアクセス用ヘッダ名.
-  var _ACCESS_CODE_KEY_HEADER = "_uaccess_user_access_";
+  // ユーザアカウントコード用ヘッダ名.
+  var _UACCESS_ACCOUNT_CODE_KEY_HEADER = "_uaccess_user_account_";
 
-  // ユーザアクセスキー長(数字羅列の長さ).
-  var _UACCESS_ACCESSS_CODE_LENGTH = 400;
+  // ユーザアカウントコードキー長(数字羅列の長さ).
+  var _UACCESS_ACCOUNT_CODE_LENGTH = 400;
 
-  // ユーザアクセスキー拡張子.
-  var _UACCESS_ACCESSS_CODE_PLUS = ".uac";
-  var _UACCESS_ACCESSS_CODE_PLUS_LEN = _UACCESS_ACCESSS_CODE_PLUS.length;
+  // ユーザアカウントコードキー拡張子.
+  var _UACCESS_ACCOUNT_CODE_PLUS = ".uac";
+  var _UACCESS_ACCOUNT_CODE_PLUS_LEN = _UACCESS_ACCOUNT_CODE_PLUS.length;
 
   // ユーザアカウント認証コードの作成.
   // name ユーザ名を設定します.
@@ -525,7 +525,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
     expire = _getExpire(expire);
     var key = fcipher.key(accountCode, name);
     var src = "{\"securityCode\": \"" + securityCode + "\", \"expire\": " + (Date.now() + expire) + "}";
-    return fcipher.enc(src, key, _ACCESS_CODE_KEY_HEADER);
+    return fcipher.enc(src, key, _UACCESS_ACCOUNT_CODE_KEY_HEADER);
   }
 
   // ユーザアカウント認証コードの認証.
@@ -538,7 +538,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   var _authAccountCode = function(name, accountCode, code) {
     try {
       var key = fcipher.key(accountCode, name);
-      var ret = fcipher.dec(code, key, _ACCESS_CODE_KEY_HEADER);
+      var ret = fcipher.dec(code, key, _UACCESS_ACCOUNT_CODE_KEY_HEADER);
       ret = JSON.parse(ret);
       ret.timeout = res.expire < Date.now();
       return ret;
@@ -552,8 +552,8 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   //
   // 戻り値: 対象ユーザのアカウントコードが返却されます.
   var _createAccountCode = function(name) {
-    var code = uniqueId.code64(uniqueId.getId(_UACCESS_ACCESSS_CODE_LENGTH));
-    file.writeByString(_UACCESS_FOLDER + "/" + name + _UACCESS_ACCESSS_CODE_PLUS, code);
+    var code = uniqueId.code64(uniqueId.getId(_UACCESS_ACCOUNT_CODE_LENGTH));
+    file.writeByString(_UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS, code);
     return code;
   }
 
@@ -562,7 +562,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   // 
   // 戻り値: 処理結果が返却されます.
   var _removeAccountCode = function(name) {
-    return file.removeFile(_UACCESS_FOLDER + "/" + name + _UACCESS_ACCESSS_CODE_PLUS);
+    return file.removeFile(_UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS);
   }
 
   // 指定ユーザのアカウントコードを取得.
@@ -570,7 +570,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   // 
   // 戻り値: アカウントコードが返されます.
   var _getAccountCode = function(name) {
-    var fileName = _UACCESS_FOLDER + "/" + name + _UACCESS_ACCESSS_CODE_PLUS;
+    var fileName = _UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS;
     if(file.isFile(fileName)) {
       return file.readByString();
     } else {
@@ -589,7 +589,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
       var len = list.length;
       for(var i =0 ; i < len; i ++) {
         name = ret[i];
-        if (name.lastIndexOf(_UACCESS_ACCESSS_CODE_PLUS) != name.length - _UACCESS_ACCESSS_CODE_PLUS_LEN) {
+        if (name.lastIndexOf(_UACCESS_ACCOUNT_CODE_PLUS) != name.length - _UACCESS_ACCOUNT_CODE_PLUS_LEN) {
           ret.push(name);
         }
       }
@@ -603,7 +603,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   // 
   // 戻り値 [true]の場合、アカウント名が登録されています.
   var _isAccountCode = function(name) {
-    var fileName = _UACCESS_FOLDER + "/" + name + _UACCESS_ACCESSS_CODE_PLUS;
+    var fileName = _UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS;
     return file.isFile(fileName);
   }
 
@@ -614,7 +614,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   var _SECURITY_CODE_LOCK = "@" + _UACCESS_SECURITY_CODE_FILE;
 
   // ユーザアカウントコードロック名.
-  var _ACCOUNT_CODE_LOCK = "@" + _UACCESS_ACCESSS_CODE_PLUS;
+  var _ACCOUNT_CODE_LOCK = "@" + _UACCESS_ACCOUNT_CODE_PLUS;
 
   // 管理者アクセス用認証用シグニチャ.
   var _UACCESS_ADMIN_ACCESS_SIGNATURES = "x-uaccess-admin-access-signatures";
@@ -723,7 +723,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
             // 正常処理が続いている場合.
             if(ret) {
 
-              // アンロックする.
+              // セキュリティコードの読み込みなので、今のロックを解除する.
               unlockFlag = true;
               psync.readUnLock(_ACCOUNT_CODE_LOCK);
 
@@ -798,7 +798,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
     return _createAuthAdminCode(userName, adminCode, expire)
   }
 
-  // ユーザアクセス認証コードを作成.
+  // ユーザアカウントコード認証コードを作成.
   // name ユーザ名を設定します.
   // accountCode このユーザのアカウントコードを設定します.
   // securityCode セキュリティコードを設定します.
@@ -878,7 +878,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   var __authAdminAccess = function(req) {
     // 管理者ユーザ認証コードがセットされていない場合.
     if(!_authAdminAccess(req)) {
-      _errorJSON("管理者コードにアクセスできません");
+      _errorJSON("管理者コードにアクセスできません", 401);
       return false;
     }
     return true;
@@ -996,7 +996,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   }
 
   // セキュリティコードを削除.
-  o.removeASecurityCode = function(req, res, lockTimeout) {
+  o.removeSecurityCode = function(req, res, lockTimeout) {
     if(!__authAdminAccess(req)) {
       return false;
     }
@@ -1054,20 +1054,20 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
     })
   }
 
-  // uaccess: ユーザアクセスコードを生成.
-  var _UACCESS_TYPE_CREATE_ACCESS_CODE = "create_access_code";
+  // uaccess: ユーザアカウントコードを生成.
+  var _UACCESS_TYPE_CREATE_ACCOUNT_CODE = "create_account_code";
 
-  // uaccess: ユーザアクセスコードを削除.
-  var _UACCESS_TYPE_REMOVE_ACCESS_CODE = "remove_access_code";
+  // uaccess: ユーザアカウントコードを削除.
+  var _UACCESS_TYPE_REMOVE_ACCOUNT_CODE = "remove_account_code";
 
-  // uaccess: ユーザアクセスコードを取得.
-  var _UACCESS_TYPE_GET_ACCESS_CODE = "get_access_code";
+  // uaccess: ユーザアカウントコードを取得.
+  var _UACCESS_TYPE_GET_ACCOUNT_CODE = "get_account_code";
 
-  // uaccess: ユーザアクセスID一覧を取得.
-  var _UACCESS_TYPE_LIST_ACCESS_CODE = "list_access_code";
+  // uaccess: ユーザアカウントコード一覧を取得.
+  var _UACCESS_TYPE_LIST_ACCOUNT_CODE = "list_account_code";
 
-  // uaccess: ユーザアクセスIDの存在チェック.
-  var _UACCESS_TYPE_IS_ACCESS_CODE = "is_access_code";
+  // uaccess: ユーザアカウントコードの存在チェック.
+  var _UACCESS_TYPE_IS_ACCOUNT_CODE = "is_account_code";
 
   // 新しいユーザアカウントコードを生成・更新.
   o.createAccountCode = function(req, res, lockTimeout) {
@@ -1081,7 +1081,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
         });
         return true;
       }
-      _errorJSON("新しいユーザアカウントコードの生成に失敗しました");
+      _errorJSON("新しいユーザアカウントコードの生成に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1102,13 +1102,13 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
         });
         return true;
       }
-      _errorJSON("ユーザアカウント情報の削除に失敗しました");
+      _errorJSON("ユーザアカウント情報の削除に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
 
   // ユーザアカウント情報を取得.
-  o.getAccessCode = function(req, res, lockTimeout) {
+  o.getAccountCode = function(req, res, lockTimeout) {
     // 管理者コード認証.
     _authAdmin(req, function(result) {
       if(result) {
@@ -1123,7 +1123,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
           return false;
         });
       }
-      _errorJSON("ユーザアカウント情報の取得に失敗しました");
+      _errorJSON("ユーザアカウント情報の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1139,7 +1139,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
         });
         return true;
       }
-      _errorJSON("ユーザアカウント一覧情報の取得に失敗しました");
+      _errorJSON("ユーザアカウント一覧情報の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1156,8 +1156,61 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
         });
         return true;
       }
-      _errorJSON("ユーザアカウント情報の存在確認の取得に失敗しました");
+      _errorJSON("ユーザアカウント情報の存在確認の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
+
+  // cbox処理.
+  o.executeCbox = function(req, res) {
+    try {
+      var executeType = req.headers[_UACCESS_TYPE];
+      var lockTimeout = req.headers[_UACCESS_TIMEOUT];
+      var method = req.method.toLowerCase();
+
+      // get以外のメソッドはエラー400にする.
+      if(method != "get") {
+        _errorJSON("bad request.", 400);
+        return;
+      }
+
+      // 実行処理.
+      switch(executeType) {
+      case _UACCESS_TYPE_CREATE_ADMIN_CODE:
+        return this.createAdminCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_REMOVE_ADMIN_CODE:
+        return this.removeAdminCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_GET_LIST_ADMIN_CODE:
+        return this.getAdminCodeList(req, res, lockTimeout);
+      case _UACCESS_TYPE_GET_ADMIN_CODE:
+        return this.getAdminCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_REMOVE_OLD_ADMIN_CODE:
+        return this.removeOldAdminCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_CREATE_SECURITY_CODE:
+        return this.createSecurityCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_REMOVE_SECURITY_CODE:
+        return this.removeSecurityCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_GET_LIST_SECURITY_CODE:
+        return this.getSecurityCodeList(req, res, lockTimeout);
+      case _UACCESS_TYPE_GET_SECURITY_CODE:
+        return this.getSecurityCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_REMOVE_OLD_SECURITY_CODE:
+        return this.removeOldSecurityCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_CREATE_ACCOUNT_CODE:
+        return this.createAccountCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_REMOVE_ACCOUNT_CODE:
+        return this.removeAccountCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_GET_ACCOUNT_CODE:
+        return this.getAccountCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_LIST_ACCOUNT_CODE:
+        return this.listAccountCode(req, res, lockTimeout);
+      case _UACCESS_TYPE_IS_ACCOUNT_CODE:
+        return this.isAccountCode(req, res, lockTimeout);
+      }
+      _errorJSON("ヘッダ:" + _UACCESS_TYPE + " の値は存在しないか、内容が不正です:" + executeType);
+    } catch(e) {
+      http.errorFileResult(500, e, res, closeFlag);
+    }
+  }
+  
 };
