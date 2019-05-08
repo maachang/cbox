@@ -2,7 +2,7 @@
 //
 //
 
-module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) {
+module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, notCmdFlg) {
   'use strict';
   var o = {};
 
@@ -11,7 +11,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   var http = require("./http");
   var psync = require("../lib/psync")(systemNanoTime);
   var uniqueId = require("../lib/uniqueId");
-  var uaccess = require("./uaccess").create(notCache, closeFlag, serverId, systemNanoTime);
+  var uaccess = require("./uaccess").create(notCache, closeFlag, serverId, systemNanoTime, notCmdFlg);
 
   // コンフィグ(実行環境用)
   var envConf = null;
@@ -842,6 +842,11 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
       }
     }
     return ret;
+  }
+
+  // uaccessオブジェクトを取得.
+  o.uaccess = function() {
+    return uaccess
   }
 
   return o;

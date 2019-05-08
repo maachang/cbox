@@ -132,6 +132,9 @@
   var cluster = require('cluster');
   if (cluster.isMaster) {
 
+    // cbox プロセス管理.
+    var cboxProc = require("./cbox/cbox_proc");
+
     // システム起動時のnanoTimeは、１度生成して、ファイル経由でcluster共有.
     var nanoTime = _createSystemNanoTime();
 
@@ -149,11 +152,28 @@
       cluster.fork();
     }
 
+    // プロセスが落ちた時の処理.
+    var _exitNode = function() {
+      process.exit();
+    };
+
+    process.on('exit', function() {
+      // cbox停止.
+      cboxProc.exitCbox();
+    })
+    // 割り込み系と、killコマンド終了.
+    process.on('SIGINT', _exitNode);
+    process.on('SIGBREAK', _exitNode);
+    process.on('SIGTERM', _exitNode);
+
     // ワーカーが落ちた場合は再起動させる.
     cluster.on('exit', function (worker, code, signal) {
       console.debug("## cluster exit to reStart.")
       cluster.fork();
     });
+
+    // cbox起動.
+    cboxProc.startCbox();
   } else {
     
     // ワーカー起動.

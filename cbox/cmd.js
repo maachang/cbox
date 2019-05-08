@@ -104,9 +104,11 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         // グローバルモジュールをセット.
         setGlobalModules(memory);
 
+
         // メモリにcboxで利用するライブラリをセット.
         memory.sysParams = Object.freeze(sysParams);
         memory.file = Object.freeze(file);
+        memory.cboxProc = Object.freeze(require("./cbox_proc"));
         memory.constants = Object.freeze(require("./constants"));
         memory.fcipher = Object.freeze(require("../lib/fcipher"));
         memory.fcomp = Object.freeze(require("../lib/fcomp"));
@@ -114,15 +116,14 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         memory.nums = Object.freeze(require("../lib/nums"));
         memory.psync = Object.freeze(require("../lib/psync")(systemNanoTime));
         memory.uniqueId = Object.freeze(require("../lib/uniqueId"));
+        memory.argsCmd = require("../lib/subs/args").clear();
 
-        // argsCmd.getParams を利用可能にする.
-        var args = require("../lib/subs/args");
-        memory.argsCmd = Object.freeze({"getParams": args.getParams});
-        args = null;
-
-        // cbox は readLock, writeLock を利用可能にする.
-        var cbox = require("./cbox").create(notCache, closeFlag, systemNanoTime);
+        // cbox は readLock, writeLock, uaccess を利用可能にする.
+        var cbox = require("./cbox").create(notCache, closeFlag,
+          serverId, systemNanoTime, memory.cboxProc.isStartCbox());
+        
         memory.cbox = Object.freeze({"readLock": cbox.readLock, "writeLock": cbox.writeLock});
+        memory.uaccess = Object.freeze(cbox.uaccess());
         cbox = null;
 
         // サーバID.

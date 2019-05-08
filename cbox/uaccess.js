@@ -26,7 +26,7 @@
 // ・ユーザアカウント認証コード.
 //
 
-module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) {
+module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, notCmdFlg) {
   'use strict';
   var o = {};
 
@@ -36,6 +36,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   var uniqueId = require("../lib/uniqueId");
   var fcipher = require("../lib/fcipher");
   var nums = require("../lib/nums");
+  var cboxProc = require("./cbox_proc");
 
   // uaccessデータ格納フォルダ名.
   var _UACCESS_FOLDER = "./.uaccess";
@@ -174,17 +175,22 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   }
 
   // パスコードファイル名.
-  var _UACCESS_PASSCODE = "uaccess_pass_code.ual"
+  var _UACCESS_PASSCODE_FILE = "uaccess_pass_code.ual"
+
+  // 空のパスコードファイルを.
+  if(!file.isFile(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE_FILE)) {
+    file.writeByString(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE_FILE, "");
+  }
 
   // パスコードを設定.
   var _setPassCode = function(value) {
-    file.writeByString(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE, value + "");
+    file.writeByString(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE_FILE, value + "");
   }
 
   // パスコードを取得.
   var _getPassCode = function() {
     try {
-      return file.readByString(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE);
+      return file.readByString(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE_FILE);
     } catch(e) {
       return "";
     }
@@ -572,7 +578,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   var _getAccountCode = function(name) {
     var fileName = _UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS;
     if(file.isFile(fileName)) {
-      return file.readByString();
+      return file.readByString(fileName);
     } else {
       return "";
     }
@@ -584,13 +590,15 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
   var _listAccountCode = function() {
     var list = file.list(_UACCESS_FOLDER);
     if(list) {
+      var p = -1;
       var name = null;
       var ret = [];
       var len = list.length;
       for(var i =0 ; i < len; i ++) {
-        name = ret[i];
-        if (name.lastIndexOf(_UACCESS_ACCOUNT_CODE_PLUS) != name.length - _UACCESS_ACCOUNT_CODE_PLUS_LEN) {
-          ret.push(name);
+        name = list[i];
+        p = name.lastIndexOf(_UACCESS_ACCOUNT_CODE_PLUS);
+        if (p != -1 && p == name.length - _UACCESS_ACCOUNT_CODE_PLUS_LEN) {
+          ret.push(name.substring(0,name.length - _UACCESS_ACCOUNT_CODE_PLUS_LEN));
         }
       }
       return ret;
@@ -770,16 +778,6 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
 
   // authAccountは、外部利用なので、外部公開する.
   o.authAccount = _authAccount;
-
-  // パスコードの登録.
-  o.createPassCode = function(code) {
-    _setPassCode(code);
-  }
-
-  // パスコードの取得.
-  o.getPassCode = function() {
-    return _getPassCode();
-  }
 
   // 管理者アクセス認証コードを生成.
   // expire 認証キーの期限を設定します.
@@ -1245,6 +1243,113 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime) 
       http.errorFileResult(500, e, res, closeFlag);
     }
   }
-  
+
+  // コマンド用の条件をセット.
+  // notCmdFlgの場合は処理できない.
+  var cmd = {};
+  o.cmd = cmd;
+
+  // コマンド実行可能かチェック.
+  // 戻り値: trueの場合実行可能です.
+  cmd.isCmd = function() {
+    return !notCmdFlg;
+  }
+
+  // パスコードの登録.
+  cmd.createPassCode = function(code) {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    _setPassCode(code);
+  }
+
+  // パスコードの取得.
+  cmd.getPassCode = function() {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _getPassCode();
+  }
+
+  // adminコードの追加.
+  cmd.addAdminCode = function() {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _addAdminCode();
+  }
+
+  // adminコードの削除.
+  cmd.removeAdminCode = function(code) {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _removeAdminCode(code);
+  }
+
+  // adminコードのリスト.
+  cmd.getAdminCodeList = function() {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _getAdminCodeList();
+  }
+
+  // securityコードの追加.
+  cmd.addSecurityCode = function() {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _addSecurityCode();
+  }
+
+  // securityコードの削除.
+  cmd.removeSecurityCode = function(code) {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _removeSecurityCode(code);
+  }
+
+  // securityコードのリスト.
+  cmd.getSecurityCodeList = function() {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _getSecurityCodeList();
+  }
+
+  // ユーザアカウントコードを設定.
+  cmd.createAccountCode = function(name) {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _createAccountCode(name);
+  }
+
+  // ユーザアカウントコードを削除.
+  cmd.removeAccountCode = function(name) {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _removeAccountCode(name);
+  }
+
+  // ユーザアカウントコードを設定.
+  cmd.getAccountCode = function(name) {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _getAccountCode(name);
+  }
+
+  // ユーザアカウントリストを取得.
+  cmd.listAccountCode = function() {
+    if(notCmdFlg) {
+      throw new Error("コマンド実行できません");
+    }
+    return _listAccountCode();
+  }
+
   return o;
 };
