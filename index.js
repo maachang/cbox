@@ -12,6 +12,9 @@
   // 基本定義情報を取得..
   var constants = require('./cbox/constants');
 
+  // プロセスタイトルをセット.
+  process.title = "node-" + constants.NAME;
+
   // コマンド引数処理.
   var argsCmd = require('./lib/subs/args');
 
@@ -157,10 +160,12 @@
       process.exit();
     };
 
+    // node処理終了.
     process.on('exit', function() {
       // cbox停止.
       cboxProc.exitCbox();
-    })
+    });
+
     // 割り込み系と、killコマンド終了.
     process.on('SIGINT', _exitNode);
     process.on('SIGBREAK', _exitNode);

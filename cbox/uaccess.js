@@ -130,9 +130,9 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var _execCall = function(res, call, errorCall) {
     try {
       if(!res) {
-        errorCall(ret);
+        errorCall(res);
       } else {
-        call(ret);
+        call(res);
       }
     } catch(e) {
       console.log(e);
@@ -250,7 +250,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var _UACCESS_ADMIN_CODE_HEADER = "_uaccess_admin_";
 
   // ユーザ管理者コード長(数字羅列の長さ).
-  var _UACCESS_ADMIN_CODE_LENGTH = 250;
+  var _UACCESS_ADMIN_CODE_LENGTH = 100;
 
   // ユーザ管理者コード登録最大数.
   var _UACCESS_ADMIN_CODE_MAX = 25;
@@ -402,7 +402,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // セキュリティコード長(数字羅列の長さ).
-  var _UACCESS_SECURITY_CODE_LENGTH = 300;
+  var _UACCESS_SECURITY_CODE_LENGTH = 150;
 
   // セキュリティコード登録最大数.
   var _UACCESS_SECURITY_CODE_MAX = 25;
@@ -514,7 +514,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var _UACCESS_ACCOUNT_CODE_KEY_HEADER = "_uaccess_user_account_";
 
   // ユーザアカウントコードキー長(数字羅列の長さ).
-  var _UACCESS_ACCOUNT_CODE_LENGTH = 400;
+  var _UACCESS_ACCOUNT_CODE_LENGTH = 200;
 
   // ユーザアカウントコードキー拡張子.
   var _UACCESS_ACCOUNT_CODE_PLUS = ".uac";
@@ -546,7 +546,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       var key = fcipher.key(accountCode, name);
       var ret = fcipher.dec(code, key, _UACCESS_ACCOUNT_CODE_KEY_HEADER);
       ret = JSON.parse(ret);
-      ret.timeout = res.expire < Date.now();
+      ret.timeout = ret.expire < Date.now();
       return ret;
     } catch(e) {
       throw new Error("ユーザアカウントコードの認証に失敗しました")

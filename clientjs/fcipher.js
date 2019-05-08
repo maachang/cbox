@@ -204,7 +204,7 @@ fcipher.key = function(word, src) {
 
 // エンコード.
 fcipher.enc = function(value, pKey, head) {
-    return o.benc(strToArray( ""+value ), pKey, head) ;
+    return fcipher.benc(strToArray( ""+value ), pKey, head) ;
 }
 
 // バイナリエンコード.
@@ -228,7 +228,7 @@ fcipher.benc = function(bin, pKey, head) {
 
 // デコード.
 fcipher.dec = function(value, pKey, head) {
-  return aryToString(o.bdec(value, pKey, head)) ;
+  return aryToString(fcipher.bdec(value, pKey, head)) ;
 }
 
 // バイナリデコード.

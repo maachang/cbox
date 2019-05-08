@@ -374,9 +374,6 @@ if(!window["global"]) {
     }
   }
 
-  // cbox 書き込み許可シグニチャ.
-  var _CBOX_WRITE_SIGNATURES = "X-Cbox-Write-Signatures"
-
   // 実行命令ヘッダ.
   var _CBOX_EXECUTE_TYPE = "X-Cbox-Execute-Type";
 
@@ -486,30 +483,90 @@ if(!window["global"]) {
     _ajax("GET", url, params, result, errorResult, noCache, header);
   }
 
+  // デフォルトexpire値(１分).
+  var _DEF_EXPIRE_TIME = 1000 * 60 * 1;
+
+  // ユーザアカウントコード用ヘッダ名.
+  var _UACCESS_ACCOUNT_CODE_KEY_HEADER = "_uaccess_user_account_";
+
+  // アクセス許可シグニチャ.
+  var _UACCESS_SIGNATURES = "x-uaccess-signatures";
+
+  // uaccessアクセスアカウント情報.
+  var _uaccessAccountName = "a";
+  var _uaccessAccountCode = "b";
+  var _uaccessSecurityCode = "c";
+
+  // ユーザアカウント認証コードのexpire値.
+  var _uaccessExpire = _DEF_EXPIRE_TIME;
+
+  // アカウント名、アカウントID、セキュリティIDをセットする.
+  var _setUAccessAccount = function(name, accountCode, securityCode) {
+    _uaccessAccountName = name;
+    _uaccessAccountCode = accountCode;
+    _uaccessSecurityCode = securityCode;
+  }
+
+  // ユーザアカウント認証コードの作成.
+  var _createAuthAccountCode = function(expire) {
+    expire = expire | 0;
+    if(expire <= 0) {
+      expire = _uaccessExpire;
+    }
+    var key = fcipher.key(_uaccessAccountCode, _uaccessAccountName);
+    var src = "{\"securityCode\": \"" + _uaccessSecurityCode + "\", \"expire\": " + (Date.now() + expire) + "}";
+    return fcipher.enc(src, key, _UACCESS_ACCOUNT_CODE_KEY_HEADER);
+  }
+
+  // ユーザアカウント認証コード用ヘッダを生成.
+  var _getAuthHeader = function(expire) {
+    var ret = {}
+    ret[_UACCESS_SIGNATURES] = _createAuthAccountCode(expire);
+    return ret;
+  }
+
   // オブジェクト.
   var o = {};
 
+  // ユーザアカウント認証コードのexpire値を設定.
+  o.setUAccessExpire = function(expire) {
+    expire = expire | 0;
+    if(expire >= 1000) {
+      _uaccessExpire = expire;
+    }
+  }
+
+  // ユーザアカウント認証コードのexpire値を取得.
+  o.getUAccessExpire = function() {
+    return _uaccessExpire;
+  }
+
+  // ユーザアカウント認証コード生成用情報の作成.
+  o.setUAccessAccount = function(name, accountCode, securityCode) {
+    _setUAccessAccount(name, accountCode, securityCode);
+  }
+
   // フォルダ作成.
   o.createFolder = function(url, result, errorResult, noCache, timeout) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_CREATE_FOLDER, {}, null, noCache, timeout, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_CREATE_FOLDER, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
   // フォルダ削除.
   // フォルダ配下は全削除します.
   o.removeFolder = function(url, result, errorResult, noCache, timeout) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_REMOVE_FOLDER, {}, null, noCache, timeout, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_REMOVE_FOLDER, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
   
   // [HTML5のFileオブジェクト]を使ってファイルアップロードでファイル登録・更新.
   // urlはフォルダまで.
   o.updateFile = function(url, value, result, errorResult, noCache, timeout) {
-    _sendUploadPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, {}, value, noCache, timeout, result, errorResult);
+    _sendUploadPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, _getAuthHeader(), value, noCache, timeout, result, errorResult);
   }
 
   // データアップロードでファイル登録・更新.
   // url の拡張子でmimeTypeの設定が可能.
   o.updateData = function(url, value, result, errorResult, noCache, timeout) {
-    _sendPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, {}, value, noCache, timeout, result, errorResult);
+    _sendPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, _getAuthHeader(), value, noCache, timeout, result, errorResult);
   }
 
   // ファイル取得.
@@ -525,32 +582,32 @@ if(!window["global"]) {
 
   // ファイル削除.
   o.removeFile = function(url, result, errorResult, noCache, timeout) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_REMOVE_FILE, {}, null, noCache, timeout, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_REMOVE_FILE, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
   // フォルダ配下のリスト一覧取得.
   o.getList = function(url, result, errorResult, noCache, timeout) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_LIST, {}, null, noCache, timeout, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_LIST, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
   // 指定ファイルが存在するかチェック.
   o.isFile = function(url, result, errorResult, noCache, timeout) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FILE, {}, null, noCache, timeout, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FILE, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
   // 指定フォルダが存在するかチェック.
   o.isFolder = function(url, result, errorResult, noCache, timeout) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FOLDER, {}, null, noCache, timeout, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FOLDER, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
   // 指定ファイル・フォルダのロック状態を取得.
   o.isLock = function(url, result, errorResult, noCache, timeout) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_LOCK, {}, null, noCache, timeout, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_IS_LOCK, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
   // 指定ファイル・フォルダのロック状態を取得.
   o.forcedLock = function(url, result, errorResult, noCache, timeout) {
-    _sendGet(url, _CBOX_EXECUTE_TYPE_FORCED_LOCK, {}, null, noCache, timeout, result, errorResult);
+    _sendGet(url, _CBOX_EXECUTE_TYPE_FORCED_LOCK, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
   _g.cbox = o;

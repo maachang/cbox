@@ -115,13 +115,115 @@ var createTab = function(url) {
   childWindow = null;
 }
 
+// localStorage.
+var local = (function() {
+var l = localStorage ;
+var o = {} ;
+o.clear = function() {
+    l.clear() ;
+}
+o.put = function( k,v ) {
+    l.setItem( k,v ) ;
+}
+o.get = function( k ) {
+    return l.getItem( k ) ;
+}
+o.remove = function( k ) {
+    l.removeItem( k ) ;
+}
+o.size = function() {
+    return l.length ;
+}
+o.keys = function() {
+    var ret = [] ;
+    var len = l.length ;
+    for( var i = 0 ; i < len ; i ++ ) {
+        ret[ret.length] = l[ i ] ;
+    }
+    return ret ;
+}
+return o;
+})();
+
+// 認証データのロード.
+var loadAuthInputValue = function() {
+  var authUser = local.get("authUser");
+  authUser = (!authUser) ? "" : authUser;
+  $get("authUser").value = authUser;
+
+  var authCode = local.get("authCode");
+  authCode = (!authCode) ? "" : authCode;
+  $get("authCode").value = authCode;
+
+  var authSecurityCode = local.get("authSecurityCode");
+  authSecurityCode = (!authSecurityCode) ? "" : authSecurityCode;
+  $get("authSecurityCode").value = authSecurityCode; 
+}
+
+// アカウント認証用のinputデータを取得.
+var _getAuthInputValue = function() {
+  var authUser = $get("authUser").value;
+  var authCode = $get("authCode").value;
+  var authSecurityCode = $get("authSecurityCode").value;
+
+  authUser = (authUser.length == 0) ? "" : authUser;
+  authCode = (authCode.length == 0) ? "" : authCode;
+  authSecurityCode = (authSecurityCode.length == 0) ? "" : authSecurityCode;
+
+  return [authUser, authCode, authSecurityCode];
+}
+
+// 認証データの保存.
+var saveAuth = function() {
+  var v = _getAuthInputValue();
+
+  local.put("authUser", v[0]);
+  local.put("authCode", v[1]);
+  local.put("authSecurityCode", v[2]);
+}
+
+// 認証データをセット.
+var settingAuth = function() {
+  var v = _getAuthInputValue();
+  cbox.setUAccessAccount(v[0], v[1], v[2]);
+}
+
+// 認証データの保存＋登録.
+var saveAndSettingAuth = function() {
+  saveAuth();
+  settingAuth();
+}
 </script>
 
 <p>
   http://domain の入力を省略すると、現在接続中のcboxにアクセスします.<br>
-  また、先頭の / を省略しても / が設定されます.
+  また、先頭の / を省略しても / が設定されます.<br>
+  <br>
+  cboxのルールとしてURLの形式は /ユーザ名/フォルダ名/フォルダ名/ファイル名 のような感じになります.<br>
+  ユーザ名配下に「読み込み処理以外」のアクセスに対して、cbox認証が必要となります.<br>
 </p>
 
+<br>
+
+<!-- cbox認証情報. -->
+<p>
+  cbox認証情報 :<br> 
+  　ユーザ名　　　　　　: <input type="text" value="" id="authUser" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('authUser')"><br>
+  　アカウントコード　　: <input type="text" value="" id="authCode" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('authCode')"><br>
+  　セキュリティコード　: <input type="text" value="" id="authSecurityCode" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('authSecurityCode')"><br>
+  <input type="button" value="登録・保存" class="base_button" onclick="saveAndSettingAuth()">
+</p>
+
+<script>
+  // 認証情報をロード.
+  loadAuthInputValue();
+  settingAuth();
+</script>
+
+<br>
 <br>
 
 <!-- createFolder -->
@@ -129,7 +231,7 @@ var createTab = function(url) {
   フォルダ作成 :<br> 
   URL: <input type="text" value="" id="createFolder" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('createFolder')">
-  &nbsp;<input type="button" value="clearFolder" class="base_button" onclick="cbox.createFolder(getUrl('createFolder'), resultCallback)">
+  &nbsp;<input type="button" value="createFolder" class="base_button" onclick="cbox.createFolder(getUrl('createFolder'), resultCallback)">
 </p>
 
 <br>
@@ -139,7 +241,7 @@ var createTab = function(url) {
   フォルダ削除 : <br>
   URL: <input type="text" value="" id="removeFolder" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('removeFolder')">
-  &nbsp;<input type="button" value="clearFolder" class="base_button" onclick="cbox.removeFolder(getUrl('removeFolder'), resultCallback)">
+  &nbsp;<input type="button" value="removeFolder" class="base_button" onclick="cbox.removeFolder(getUrl('removeFolder'), resultCallback)">
 </p>
 
 <br>
@@ -188,7 +290,7 @@ var createTab = function(url) {
 
 <br>
 
-<!-- removeFile -->
+<!-- getList -->
 <p>
   ファイルリスト取得 : <br>
   URL: <input type="text" value="" id="getList" class="base_input_text" max="512" size="50">
@@ -208,7 +310,7 @@ var createTab = function(url) {
 
 <br>
 
-<!-- isFile -->
+<!-- isFolder -->
 <p>
   フォルダ存在チェック : <br>
   URL: <input type="text" value="" id="isFolder" class="base_input_text" max="512" size="50">
@@ -218,7 +320,7 @@ var createTab = function(url) {
 
 <br>
 
-<!-- isFile -->
+<!-- isLock -->
 <p>
   ロック存在チェック : <br>
   URL: <input type="text" value="" id="isLock" class="base_input_text" max="512" size="50">
@@ -228,15 +330,15 @@ var createTab = function(url) {
 
 <br>
 
-<!-- isFile -->
+<!-- forcedLock -->
 <p>
-    ロック強制解除チェック : <br>
-    URL: <input type="text" value="" id="forcedLock" class="base_input_text" max="512" size="50">
-    &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('forcedLock')">
-    &nbsp;<input type="button" value="ロック解除" class="base_button" onclick="cbox.forcedLock(getUrl('forcedLock'), resultCallback)">
-  </p>
-  
-  <br>
+  ロック強制解除チェック : <br>
+  URL: <input type="text" value="" id="forcedLock" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('forcedLock')">
+  &nbsp;<input type="button" value="ロック解除" class="base_button" onclick="cbox.forcedLock(getUrl('forcedLock'), resultCallback)">
+</p>
+
+<br>
 
 </body>
 </html>
