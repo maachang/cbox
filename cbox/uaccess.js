@@ -36,7 +36,6 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var uniqueId = require("../lib/uniqueId");
   var fcipher = require("../lib/fcipher");
   var nums = require("../lib/nums");
-  var cboxProc = require("./cbox_proc");
 
   // uaccessデータ格納フォルダ名.
   var _UACCESS_FOLDER = "./.uaccess";

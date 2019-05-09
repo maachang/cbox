@@ -257,16 +257,7 @@ fcipher.bdec = function(value, pKey, head) {
   return body;
 }
 
-var _convert = function(key, no, pause) {
-  switch ((no & 0x00000001)) {
-    case 0:
-      return ((~(pause ^ key[no])) & 0x000000ff) ;
-    case 1:
-      return ((pause ^ key[no]) & 0x000000ff) ;
-  }
-  return 0 ;
-}
-
+// ランダムキー生成.
 var _randKey = function() {
   var bin = new Uint8Array(32) ;
   for( var i = 0 ; i < 32 ; i ++ ) {
@@ -275,27 +266,34 @@ var _randKey = function() {
   return bin ;
 }
 
-var code16 = function(s,mode) {
-  var ret = [177, 75, 163, 143, 73, 49, 207, 40, 87, 41, 169, 91, 184, 67, 254, 89];
+// コード16データを作成.
+// s 処理対象情報.
+// mode
+//   1 : string
+//   それ以外: 配列.
+var code16 = function(s, mode) {
+  var ret = mode == 1 ?
+    [177, 75, 163, 143, 73, 49, 207, 40, 87, 41, 169, 91, 184, 67, 254, 89] :
+    [87, 41, 169, 91, 184, 67, 254, 89, 177, 75, 163, 143, 73, 49, 207, 40] ;
   var n;
   var len = s.length;
   mode = mode|0;
   for(var i = 0; i < len; i ++) {
-    n = mode==1 ? s.charCodeAt(i)|0 : s[i];
+    n = (mode==1 ? s.charCodeAt(i)|0 : s[i]|0) & 0x00ffffff;
     if((i&0x00000001) == 0) {
-      for(var j = 1; j < 16; j+= 2) {
+      for(var j = 0; j < 16; j+= 2) {
         ret[j] = ret[j] ^ (n-(i+j));
       }
-      for(var j = 0; j < 16; j+= 2) {
-        ret[j] = ret[j] * (n-(i+j));
+      for(var j = 1; j < 16; j+= 1) {
+        ret[j] = ret[j] ^ ~(n-(i+j));
       }
     }
     else {
-      for(var j = 0; j < 16; j+= 2) {
+      for(var j = 1; j < 16; j+= 1) {
         ret[j] = ret[j] ^ (n-(i+j));
       }
-      for(var j = 1; j < 16; j+= 2) {
-        ret[j] = ret[j] * (n-(i+j));
+      for(var j = 0; j < 16; j+= 2) {
+        ret[j] = ret[j] ^ ~(n-(i+j));
       }
     }
   }
@@ -303,6 +301,17 @@ var code16 = function(s,mode) {
     ret[i] = ret[i] & 0x000000ff;
   }
   return ret;
+}
+
+/// 変換処理.
+var _convert = function(key, no, pause) {
+  switch ((no & 0x00000001)) {
+    case 0:
+      return (((pause ^ key[no])) & 0x000000ff) ;
+    case 1:
+      return (~(pause ^ key[no]) & 0x000000ff) ;
+  }
+  return 0 ;
 }
 
 var _convertKey = function(pKey, key) {
