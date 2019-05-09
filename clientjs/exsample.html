@@ -25,7 +25,6 @@
 <meta http-equiv="content-script-type" content="text/javascript; charset=utf-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
 
-<script src="/client/fcipher.js"></script>
 <script src="/client/cbox.js"></script>
 
 <link rel="stylesheet" href="/client/exsample.css" type="text/css">
@@ -186,7 +185,7 @@ var saveAuth = function() {
 // 認証データをセット.
 var settingAuth = function() {
   var v = _getAuthInputValue();
-  cbox.setUAccessAccount(v[0], v[1], v[2]);
+  cbox.setAuthInfo(v[0], v[1], v[2]);
 }
 
 // 認証データの保存＋登録.

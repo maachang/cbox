@@ -195,8 +195,8 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     }
   }
 
-  // 基本キーコード.
-  var _KEYCODE = "_#_$_UaccExce8s%Uu1d$_C0d3#_";
+  // 管理者アクセスコードキーコード.
+  var _UACCESS_ADMIN_CODE_KEYCODE = "_#_$_UaccExce8s%Uu1d$_C0d3#_";
 
   // 管理者アクセスコードヘッダ.
   var _UACCESS_ADMIN_CODE_HEADER = "_uaccess_admin_access";
@@ -210,7 +210,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     // パスコードを取得.
     var passCode = _getPassCode();
     if(passCode == "") {
-      passCode = _KEYCODE;
+      passCode = _UACCESS_ADMIN_CODE_KEYCODE;
     }
     // パック化.
     expire = _getExpire(expire);
@@ -230,7 +230,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       // パスコードを取得.
       var passCode = _getPassCode();
       if(passCode == "") {
-        passCode = _KEYCODE;
+        passCode = _UACCESS_ADMIN_CODE_KEYCODE;
       }
       // アンパック化.
       var key = fcipher.key(passCode, uuid);
@@ -929,9 +929,8 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     if(!__authAdminAccess(req)) {
       return false;
     }
-    var code = req.headers[_UACCESS_PARAMS];
     _baseRead(req, res, lockTimeout, _ADMIN_CODE_LOCK, function() {
-      _successJSON("管理者コードの一覧取得に成功しました", _getAdminCodeList(code));
+      _successJSON("管理者コードの一覧取得に成功しました", _getAdminCodeList());
       return true;
     })
   }
@@ -1014,9 +1013,8 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     if(!__authAdminAccess(req)) {
       return false;
     }
-    var code = req.headers[_UACCESS_PARAMS];
     _baseRead(req, res, lockTimeout, _SECURITY_CODE_LOCK, function() {
-      _successJSON("セキュリティコードの一覧取得に成功しました", _getSecurityCodeList(code));
+      _successJSON("セキュリティコードの一覧取得に成功しました", _getSecurityCodeList());
       return true;
     })
   }
