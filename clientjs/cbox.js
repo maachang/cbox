@@ -508,68 +508,6 @@ if(!window["global"]) {
   // header : ヘッダ情報.
   ////////////////////////////////////////////////////////////////////////////////
   var _ajax = (function(){
-    var ie = false ;
-    var xdom = false ;
-    var ia = 'Msxml2.XMLHTTP' ;
-    try {
-      new XDomainRequest() ;
-      ie = true ;
-      xdom = true ;
-    } catch( ee ) {
-      try {
-        new ActiveXObject(ia) ;
-        ie = true ;
-      } catch( e ) {
-      }
-    }
-    var ax =(function(){
-      var a ;
-      if( ie ) {
-        try {
-          a = new XMLHttpRequest() ;
-          a = function() { return new XMLHttpRequest() ; }
-        } catch( e ) {
-        }
-        if( a == _u ) {
-          try {
-            new ActiveXObject( ia+".6.0" ) ;
-            a = function() { return new ActiveXObject( ia+".6.0" ) ; } ;
-          } catch( e ) {}
-        }
-        if( a == _u ) {
-          try {
-            new ActiveXObject( ia+".3.0" ) ;
-            a = function() { return new ActiveXObject( ia+".3.0" ) ; } ;
-          } catch( e ) {}
-        }
-        if( a == _u ) {
-          try {
-            new ActiveXObject( ia ) ;
-            a = function() { return new ActiveXObject( ia ) ; } ;
-          } catch( e ) {}
-        }
-        if( a == _u ) {
-          a = function() { return new ActiveXObject( "Microsoft.XMLHTTP" ) ; } ;
-        }
-      }
-      if( a == _u ) {
-        a = function(){
-          return new XMLHttpRequest()
-        }
-      }
-      if( xdom ) {
-          return function(d) {
-              if( d == 1 ) {
-                  var n = new XDomainRequest() ;
-                  n.ie = 0 ;
-                  return n ;
-              }
-              return a() ;
-          }
-      }
-      return a ;
-    })();
-    
     var head = function(m,x,h){
       if(!h["Content-Type"]) {
         if(m=='POST') {
@@ -593,6 +531,7 @@ if(!window["global"]) {
     }
     
     return function(method ,url, params, func, errFunc, noCache, header) {
+      errFunc = (typeof(errFunc) != "function") ? func : errFunc;
       method = (method+"").toUpperCase() ;
       if(noCache != true) {
         url += (( url.indexOf( "?" ) == -1 )? "?":"&" )+(new Date().getTime()) ;
@@ -607,11 +546,11 @@ if(!window["global"]) {
         else {
           var cnt = 0;
           for( var k in params ) {
-              if(cnt != 0) {
-                  pms += "&";
-              }
-              pms += k + "=" + encodeURIComponent( params[ k ] ) ;
-              cnt ++;
+            if(cnt != 0) {
+              pms += "&";
+            }
+            pms += k + "=" + encodeURIComponent( params[ k ] ) ;
+            cnt ++;
           }
         }
       }
@@ -619,8 +558,9 @@ if(!window["global"]) {
         url += pms ;
         pms = null ;
       }
+      // 同期Ajax.
       if( func == _u ) {
-        var x=ax();
+        var x = new XMLHttpRequest();
         x.open(_m(method),url,false);
         head(method,x,header);
         x.send(pms);
@@ -635,11 +575,12 @@ if(!window["global"]) {
         }
         throw new Error("response status:" + state + " error");
       }
+      // 非同期Ajax.
       else {
-        var x = ax((/^https?:\/\//i.test(url))?1:0);
-        if( x.ie == 0 ) {
-          x.onprogress = function() {}
-          x.onload = function() {
+        var x = new XMLHttpRequest();
+        x.open(_m(method),url,true);
+        x.onload = function(){
+          if(x.readyState==4) {
             try {
               var status = x.status;
               if(!status || status == 0) {
@@ -647,10 +588,8 @@ if(!window["global"]) {
               }
               if( status < 300 ) {
                 func(status,x.responseText) ;
-              } else if( errFunc != _u ) {
-                errFunc(status,x.responseText) ;
               } else {
-                func(status,x.responseText) ;
+                errFunc(status,x.responseText) ;
               }
             } finally {
               x.abort() ;
@@ -659,112 +598,24 @@ if(!window["global"]) {
               errFunc = null;
             }
           }
-          if( errFunc != _u ) {
-              x.onerror = function() {
-                var status = x.status;
-                if(!status || status == 0) {
-                  status = 500;
-                }
-                errFunc(status,x.responseText) ;
-                x.abort() ;
-                x = null;
-                func = null;
-                errFunc = null;
-              }
-          } else {
-            x.onerror = function() {
-              var status = x.status;
-              if(!status || status == 0) {
-                status = 500;
-              }
-              func(status,x.responseText) ;
-              x.abort() ;
-              x = null;
-              func = null;
-              errFunc = null;
-            }
+        };
+        x.onerror = function() {
+          var status = x.status;
+          if(!status || status == 0) {
+            status = 500;
           }
-          x.open(_m(method),url);
-        }
-        else {
-          x.open(_m(method),url,true);
-          if( ie ) {
-            x.onreadystatechange=function(){
-              if(x.readyState==4) {
-                  try {
-                    var status = x.status;
-                    if(!status || status == 0) {
-                      status = 500;
-                    }
-                    if( status < 300 ) {
-                      func(status,x.responseText) ;
-                    } else if( errFunc != _u ) {
-                      errFunc(status,x.responseText) ;
-                    } else {
-                      func(status,x.responseText) ;
-                    }
-                  } finally {
-                    x.abort() ;
-                    x = null;
-                    func = null;
-                    errFunc = null;
-                  }
-                }
-            };
+          try {
+            errFunc(status,x.responseText ) ;
+          } finally {
+            x.abort() ;
+            x = null;
+            func = null;
+            errFunc = null;
           }
-          else {
-              x.onload = function(){
-                if(x.readyState==4) {
-                  try {
-                    var status = x.status;
-                    if(!status || status == 0) {
-                      status = 500;
-                    }
-                    if( status < 300 ) {
-                      func(status,x.responseText) ;
-                    } else if( errFunc != _u ) {
-                      errFunc(status,x.responseText) ;
-                    } else {
-                      func(status,x.responseText) ;
-                    }
-                  } finally {
-                    x.abort() ;
-                    x = null;
-                    func = null;
-                    errFunc = null;
-                  }
-                }
-              };
-              if( errFunc != _u ) {
-                x.onerror = function() {
-                  var state = x.status;
-                  if(!status || status == 0) {
-                    status = 500;
-                  }
-                  errFunc(status,x.responseText ) ;
-                  x.abort() ;
-                  x = null;
-                  func = null;
-                  errFunc = null;
-                }
-              } else {
-                x.onerror = function() {
-                  var status = x.status;
-                  if(!status || status == 0) {
-                    status = 500;
-                  }
-                  func( status,x.responseText ) ;
-                  x.abort() ;
-                  x = null;
-                  func = null;
-                  errFunc = null;
-                }
-              }
-          };
         }
-        head(method,x,header);
-        x.send(pms);
       }
+      head(method,x,header);
+      x.send(pms);
     };
   })() ;
 
@@ -1122,6 +973,7 @@ if(!window["global"]) {
     _sendGet(url, _CBOX_EXECUTE_TYPE_FORCED_LOCK, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
+  
   // 管理者コード.
   var admin = {}
   o.admin = admin;
@@ -1270,6 +1122,7 @@ if(!window["global"]) {
       null, noCache, timeout, result, errorResult);
   }
 
+
   // ユーザアカウント情報.
   var account = {}
   o.account = account;
@@ -1283,18 +1136,19 @@ if(!window["global"]) {
   // 管理者認証用シグニチャ.
   var _UACCESS_ADMIN_SIGNATURES = "x-uaccess-admin-signatures";
 
+  // リスト取得時のアカウント名.
+  var _UACCESS_ADMIN_LIST_ACCOUNT = "*";
+
   // uaccess管理者認証コード情報.
-  var _uaccessAdminName = "a";
-  var _uaccessAdminCode = "b";
+  var _uaccessAdminCode = "c";
 
   // アカウント名、管理者IDをセットする.
-  var _setUAccessAdmin = function(adminName, adminCode) {
-    _uaccessAdminName = adminName;
+  var _setUAccessAdmin = function(adminCode) {
     _uaccessAdminCode = adminCode;
   }
 
   // 管理者認証コードの作成.
-  var _createAuthAdminCode = function(expire) {
+  var _createAuthAdminCode = function(name, expire) {
     // パスコードを取得.
     var passCode = _cboxPassCode;
     if(passCode == "") {
@@ -1305,21 +1159,36 @@ if(!window["global"]) {
     if(expire <= 0) {
       expire = _uaccessExpire;
     }
-    var key = fcipher.key(passCode, _uaccessAdminName);
+    var key = fcipher.key(passCode, name);
     var src = "{\"adminCode\": \"" + _uaccessAdminCode + "\", \"expire\": " + (Date.now() + expire) + "}";
     return fcipher.enc(src, key, _UACCESS_ADMIN_CODE_HEADER);
   }
 
   // 管理者認証コード用ヘッダを生成.
-  var _getAuthAdminCodeHeader = function(expire) {
+  var _getAuthAdminCodeHeader = function(name, expire) {
+    if(!name || name == "") {
+      throw new Error("アカウント名が設定されていません");
+    }
     var ret = {}
-    ret[_UACCESS_ADMIN_SIGNATURES] = _createAuthAdminCode(expire);
+    ret[_UACCESS_ADMIN_SIGNATURES] = _createAuthAdminCode(name, expire);
     return ret;
   }
 
+  // URLからアカウント名を取得.
+  var _getUrlByAccount = function(name) {
+    var p = name.indexOf("/");
+    if(p == 0) {
+      name = name.substring(1);
+      if((p = name.indexOf("/", 1)) == -1) {
+        return name;
+      }
+    }
+    return name.substring(0, p);
+  }
+
   // 管理者向けアカウント名、管理者IDをセットする.
-  account.setAuthInfo = function(adminName, adminCode) {
-    _setUAccessAdmin(adminName, adminCode);
+  account.setAuthInfo = function(adminCode) {
+    _setUAccessAdmin(adminCode);
   }
 
   // uaccess: ユーザアカウントコードを生成.
@@ -1339,31 +1208,31 @@ if(!window["global"]) {
 
   // 新しいユーザアカウントコードを生成.
   account.create = function(url, result, errorResult, noCache, timeout) {
-    _sendUaccess(url, _UACCESS_TYPE_CREATE_ACCOUNT_CODE, _getAuthAdminCodeHeader(),
+    _sendUaccess(url, _UACCESS_TYPE_CREATE_ACCOUNT_CODE, _getAuthAdminCodeHeader(_getUrlByAccount(url)),
       null, noCache, timeout, result, errorResult);
   }
   
   // ユーザアカウントコードを削除.
   account.remove = function(url, result, errorResult, noCache, timeout) {
-    _sendUaccess(url, _UACCESS_TYPE_REMOVE_ACCOUNT_CODE, _getAuthAdminCodeHeader(),
+    _sendUaccess(url, _UACCESS_TYPE_REMOVE_ACCOUNT_CODE, _getAuthAdminCodeHeader(_getUrlByAccount(url)),
       null, noCache, timeout, result, errorResult);
   }
 
   // ユーザアカウントコードを取得.
   account.get = function(url, result, errorResult, noCache, timeout) {
-    _sendUaccess(url, _UACCESS_TYPE_GET_ACCOUNT_CODE, _getAuthAdminCodeHeader(),
+    _sendUaccess(url, _UACCESS_TYPE_GET_ACCOUNT_CODE, _getAuthAdminCodeHeader(_getUrlByAccount(url)),
       null, noCache, timeout, result, errorResult);
   }
 
   // ユーザアカウントコード一覧を取得.
   account.list = function(url, result, errorResult, noCache, timeout) {
-    _sendUaccess(url, _UACCESS_TYPE_LIST_ACCOUNT_CODE, _getAuthAdminCodeHeader(),
+    _sendUaccess(url, _UACCESS_TYPE_LIST_ACCOUNT_CODE, _getAuthAdminCodeHeader(_UACCESS_ADMIN_LIST_ACCOUNT),
       null, noCache, timeout, result, errorResult);
   }
 
   // ユーザアカウントコードの存在チェック.
   account.isAccount = function(url, result, errorResult, noCache, timeout) {
-    _sendUaccess(url, _UACCESS_TYPE_IS_ACCOUNT_CODE, _getAuthAdminCodeHeader(),
+    _sendUaccess(url, _UACCESS_TYPE_IS_ACCOUNT_CODE, _getAuthAdminCodeHeader(_getUrlByAccount(url)),
       null, noCache, timeout, result, errorResult);
   }
 

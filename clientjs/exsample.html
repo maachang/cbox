@@ -145,54 +145,118 @@ o.keys = function() {
 return o;
 })();
 
-// 認証データのロード.
+// ローカルストレージからInput要素にロード.
+var _loadInput = function(id) {
+  var n = local.get(id);
+  n = (!n) ? "" : n;
+  $get(id).value = n;
+}
+
+// Input要素からデータを取得.
+var _getInput = function(id) {
+  var n = $get(id).value;
+  return (n.length == 0) ? "" : n;
+}
+
+// authAdminAccountUUID, authPassCode
+
+// 管理者アカウント認証データのロード.
+var loadAuthAdminAccountInputValue = function() {
+  _loadInput("authAdminAccountUUID");
+  _loadInput("authPassCode");
+}
+
+// 管理者アカウント認証用のinputデータを取得.
+var getAuthAdminAccountInputValue = function() {
+  return [_getInput("authAdminAccountUUID"), _getInput("authPassCode")]
+}
+
+// 管理者アカウント認証データの保存.
+var saveAuthAdminAccount = function() {
+  var v = getAuthAdminAccountInputValue();
+  local.put("authAdminAccountUUID", v[0]);
+  local.put("authPassCode", v[1]);
+}
+
+// 管理者アカウント認証データをcboxにセット.
+var settingAuthAdminAccount = function() {
+  var v = getAuthAdminAccountInputValue();
+  cbox.admin.setAuthInfo(v[0], v[1]);
+}
+
+// 管理者アカウント認証データの保存＋登録.
+var saveAndSettingAuthAdminAccount = function() {
+  saveAuthAdminAccount();
+  settingAuthAdminAccount();
+  alert("管理者アカウント認証: 保存しました");
+}
+
+// authAdminCode.
+
+// 管理者認証データのロード.
+var loadAuthAdminAccountInputValue = function() {
+  _loadInput("authAdminCode");
+}
+
+// 管理者認証用のinputデータを取得.
+var getAuthAdminInputValue = function() {
+  return [_getInput("authAdminCode")]
+}
+
+// 管理者認証データの保存.
+var saveAuthAdmin = function() {
+  var v = getAuthAdminInputValue();
+  local.put("authAdminCode", v[0]);
+}
+
+// 管理者認証データをcboxにセット.
+var settingAuthAdmin = function() {
+  var v = getAuthAdminInputValue();
+  cbox.admin.setAuthInfo(v[0]);
+}
+
+// 管理者認証データの保存＋登録.
+var saveAndSettingAuthAdmin = function() {
+  saveAuthAdmin();
+  settingAuthAdmin();
+  alert("管理者認証: 保存しました");
+}
+
+// authUser, authCode, authSecurityCode.
+
+// アカウント認証データのロード.
 var loadAuthInputValue = function() {
-  var authUser = local.get("authUser");
-  authUser = (!authUser) ? "" : authUser;
-  $get("authUser").value = authUser;
-
-  var authCode = local.get("authCode");
-  authCode = (!authCode) ? "" : authCode;
-  $get("authCode").value = authCode;
-
-  var authSecurityCode = local.get("authSecurityCode");
-  authSecurityCode = (!authSecurityCode) ? "" : authSecurityCode;
-  $get("authSecurityCode").value = authSecurityCode; 
+  _loadInput("authUser");
+  _loadInput("authCode");
+  _loadInput("authSecurityCode");
 }
 
 // アカウント認証用のinputデータを取得.
-var _getAuthInputValue = function() {
-  var authUser = $get("authUser").value;
-  var authCode = $get("authCode").value;
-  var authSecurityCode = $get("authSecurityCode").value;
-
-  authUser = (authUser.length == 0) ? "" : authUser;
-  authCode = (authCode.length == 0) ? "" : authCode;
-  authSecurityCode = (authSecurityCode.length == 0) ? "" : authSecurityCode;
-
-  return [authUser, authCode, authSecurityCode];
+var getAuthInputValue = function() {
+  return [_getInput("authUser"), _getInput("authCode"), _getInput("authSecurityCode")]
 }
 
-// 認証データの保存.
+// アカウント認証データの保存.
 var saveAuth = function() {
-  var v = _getAuthInputValue();
-
+  var v = getAuthInputValue();
   local.put("authUser", v[0]);
   local.put("authCode", v[1]);
   local.put("authSecurityCode", v[2]);
 }
 
-// 認証データをセット.
+// アカウント認証データをcboxにセット.
 var settingAuth = function() {
-  var v = _getAuthInputValue();
+  var v = getAuthInputValue();
   cbox.setAuthInfo(v[0], v[1], v[2]);
 }
 
-// 認証データの保存＋登録.
+// アカウント認証データの保存＋登録.
 var saveAndSettingAuth = function() {
   saveAuth();
   settingAuth();
+  alert("アカウント認証: 保存しました");
 }
+
 </script>
 
 <p>
@@ -201,6 +265,28 @@ var saveAndSettingAuth = function() {
   <br>
   cboxのルールとしてURLの形式は /ユーザ名/フォルダ名/フォルダ名/ファイル名 のような感じになります.<br>
   ユーザ名配下に「読み込み処理以外」のアクセスに対して、cbox認証が必要となります.<br>
+</p>
+
+<br>
+
+<!-- cbox管理者アクセス認証情報. -->
+<p>
+  cbox管理者アクセス認証情報 :<br> 
+  　ＵＵＩＤ　　　　　　: <input type="text" value="" id="authAdminAccountUUID" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('authAdminAccountUUID')"><br>
+  　パスコード　　　　　: <input type="text" value="" id="authPassCode" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('authPassCode')"><br>
+  <input type="button" value="登録・保存" class="base_button" onclick="saveAndSettingAuthAdminAccount()">
+</p>
+
+<br>
+
+<!-- cbox管理者コード認証情報. -->
+<p>
+  cbox管理者コード認証情報 :<br> 
+  　管理者コード　　　　: <input type="text" value="" id="authAdminCode" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('authAdminCode')"><br>
+  <input type="button" value="登録・保存" class="base_button" onclick="saveAndSettingAuthAdmin()">
 </p>
 
 <br>
@@ -218,6 +304,10 @@ var saveAndSettingAuth = function() {
 </p>
 
 <script>
+  // 管理者アカウント認証情報をロード.
+  loadAuthAdminAccountInputValue();
+  settingAuthAdminAccount();
+
   // 認証情報をロード.
   loadAuthInputValue();
   settingAuth();
