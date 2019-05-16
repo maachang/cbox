@@ -248,7 +248,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
             case _CBOX_EXECUTE_TYPE_REMOVE_FILE:
               return o.removeFile(req, res, lockTimeout);
             case _CBOX_EXECUTE_TYPE_FORCED_LOCK:
-            return o.forcedLock(req, res);
+              return o.forcedLock(req, res);
           }
 
           // 読み込み系処理.

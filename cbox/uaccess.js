@@ -151,7 +151,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // 正常JSONを返却.
-  var _successJSON = function(message, value, status) {
+  var _successJSON = function(res, message, value, status) {
     if(!nums.isNumeric(status)) {
       status = 500;
     }
@@ -163,7 +163,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // エラーJSONを返却.
-  var _errorJSON = function(message, status) {
+  var _errorJSON = function(res, message, status) {
     if(!nums.isNumeric(status)) {
       status = 500;
     }
@@ -176,14 +176,21 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // パスコードファイル名.
   var _UACCESS_PASSCODE_FILE = "uaccess_pass_code.ual"
 
-  // 空のパスコードファイルを.
+  // 空のパスコードファイルを作成.
   if(!file.isFile(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE_FILE)) {
     file.writeByString(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE_FILE, "");
   }
 
   // パスコードを設定.
   var _setPassCode = function(value) {
-    file.writeByString(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE_FILE, value + "");
+    // パスコードが空の場合は、空で保存.
+    if(!value || typeof(value) != "string" || value == "") {
+      value = "";
+    // パスコードがセットされている場合は、fcipher.fhashでハッシュ化.
+    } else {
+      value = fcipher.fhash(value);
+    }
+    file.writeByString(_UACCESS_FOLDER + "/" + _UACCESS_PASSCODE_FILE, value);
   }
 
   // パスコードを取得.
@@ -196,10 +203,10 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // 管理者アクセスコードキーコード.
-  var _UACCESS_ADMIN_CODE_KEYCODE = "_#_$_UaccExce8s%Uu1d$_C0d3#_";
+  var _UACCESS_ADMIN_ACCESS_CODE_KEYCODE = "_#_$_UaccExce8s%Uu1d$_C0d3#_";
 
   // 管理者アクセスコードヘッダ.
-  var _UACCESS_ADMIN_CODE_HEADER = "_uaccess_admin_access";
+  var _UACCESS_ADMIN_ACCESS_CODE_HEADER = "_uaccess_admin_access";
 
   // 管理者アクセス認証コードを生成.
   // uuid: アクセスコード生成用のUUIDをセット.
@@ -209,14 +216,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var _createAuthAdminAccessCode = function(uuid, expire) {
     // パスコードを取得.
     var passCode = _getPassCode();
-    if(passCode == "") {
-      passCode = _UACCESS_ADMIN_CODE_KEYCODE;
+    if(!passCode || passCode == "") {
+      passCode = _UACCESS_ADMIN_ACCESS_CODE_KEYCODE;
     }
     // パック化.
     expire = _getExpire(expire);
     var key = fcipher.key(passCode, uuid);
     var src = "{\"expire\": " + (Date.now() + expire) + "}";
-    return fcipher.enc(src, key, _UACCESS_ADMIN_CODE_HEADER);
+    return fcipher.enc(src, key, _UACCESS_ADMIN_ACCESS_CODE_HEADER);
   }
 
   // 管理者アクセス認証コードが正しいかチェックして、有効期間を取得(ミリ秒).
@@ -229,12 +236,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     try {
       // パスコードを取得.
       var passCode = _getPassCode();
-      if(passCode == "") {
-        passCode = _UACCESS_ADMIN_CODE_KEYCODE;
+      if(!passCode || passCode == "") {
+        passCode = _UACCESS_ADMIN_ACCESS_CODE_KEYCODE;
       }
       // アンパック化.
       var key = fcipher.key(passCode, uuid);
-      var res = fcipher.dec(code, key, _UACCESS_ADMIN_CODE_HEADER);
+      var res = fcipher.dec(code, key, _UACCESS_ADMIN_ACCESS_CODE_HEADER);
       var expire = JSON.parse(res).expire;
       return {expire: expire, timeout: expire < Date.now()};
     } catch(e) {
@@ -834,7 +841,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         ret = false;
       } finally {
         // アンロック.
-        psync.unlock(lockName);
+        psync.unLock(lockName);
         if(!ret) {
           // リクエストを閉じる.
           _closeReq(req);
@@ -873,10 +880,10 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // 管理者ユーザ認証コードがセットされていないかチェック.
-  var __authAdminAccess = function(req) {
+  var __authAdminAccess = function(req, res) {
     // 管理者ユーザ認証コードがセットされていない場合.
     if(!_authAdminAccess(req)) {
-      _errorJSON("管理者コードにアクセスできません", 401);
+      _errorJSON(res, "管理者コードにアクセスできません", 401);
       return false;
     }
     return true;
@@ -899,26 +906,26 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
   // 新しい管理者コードを生成
   o.createAdminCode = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     _baseWrite(req, res, lockTimeout, _ADMIN_CODE_LOCK, function() {
-      _successJSON("新しい管理者コード作成しました", _addAdminCode());
+      _successJSON(res, "新しい管理者コード作成しました", _addAdminCode());
       return true;
     })
   }
 
   // 管理者コードを削除.
   o.removeAdminCode = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     var code = req.headers[_UACCESS_PARAMS];
     _baseWrite(req, res, lockTimeout, _ADMIN_CODE_LOCK, function() {
       if(_removeAdminCode(code)) {
-        _successJSON("管理者コードの削除に成功しました");
+        _successJSON(res, "管理者コードの削除に成功しました");
       } else {
-        _errorJSON("管理者コードの削除に失敗しました");
+        _errorJSON(res, "管理者コードの削除に失敗しました");
       }
       return true;
     })
@@ -926,26 +933,26 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
   // 管理者コード一覧を取得..
   o.getAdminCodeList = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     _baseRead(req, res, lockTimeout, _ADMIN_CODE_LOCK, function() {
-      _successJSON("管理者コードの一覧取得に成功しました", _getAdminCodeList());
+      _successJSON(res, "管理者コードの一覧取得に成功しました", _getAdminCodeList());
       return true;
     })
   }
 
   // 最新の管理者コードを削除.
   o.getAdminCode = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     _baseRead(req, res, lockTimeout, _ADMIN_CODE_LOCK, function() {
       var code = _getAdminCode();
       if(code) {
-        _successJSON("最新の管理者コードの取得に成功しました", code);
+        _successJSON(res, "最新の管理者コードの取得に成功しました", code);
       } else {
-        _errorJSON("最新の管理者コードの取得に失敗しました");
+        _errorJSON(res, "最新の管理者コードの取得に失敗しました");
       }
       return true;
     })
@@ -953,14 +960,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
   // 一番古い管理者コードを削除.
   o.removeOldAdminCode = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     _baseWrite(req, res, lockTimeout, _ADMIN_CODE_LOCK, function() {
       if(_removeOldAdminCode()) {
-        _successJSON("一番古い管理者コードの削除に成功しました");
+        _successJSON(res, "一番古い管理者コードの削除に成功しました");
       } else {
-        _errorJSON("一番古い管理者コードの削除に失敗しました");
+        _errorJSON(res, "一番古い管理者コードの削除に失敗しました");
       }
       return true;
     })
@@ -983,26 +990,26 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
   // 新しいセキュリティコードを生成
   o.createSecurityCode = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     _baseWrite(req, res, lockTimeout, _SECURITY_CODE_LOCK, function() {
-      _successJSON("新しいセキュリティコード作成しました", _addSecurityCode())
+      _successJSON(res, "新しいセキュリティコード作成しました", _addSecurityCode())
       return true;
     })
   }
 
   // セキュリティコードを削除.
   o.removeSecurityCode = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     var code = req.headers[_UACCESS_PARAMS];
     _baseWrite(req, res, lockTimeout, _SECURITY_CODE_LOCK, function() {
       if(_removeSecurityCode(code)) {
-        _successJSON("セキュリティコードの削除に成功しました");
+        _successJSON(res, "セキュリティコードの削除に成功しました");
       } else {
-        _errorJSON("セキュリティコードの削除に失敗しました");
+        _errorJSON(res, "セキュリティコードの削除に失敗しました");
       }
       return true;
     })
@@ -1010,42 +1017,42 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
   // セキュリティコード一覧を取得.
   o.getSecurityCodeList = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     _baseRead(req, res, lockTimeout, _SECURITY_CODE_LOCK, function() {
-      _successJSON("セキュリティコードの一覧取得に成功しました", _getSecurityCodeList());
+      _successJSON(res, "セキュリティコードの一覧取得に成功しました", _getSecurityCodeList());
       return true;
     })
   }
 
   // 最新のセキュリティコードを削除.
   o.getSecurityCode = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     _baseRead(req, res, lockTimeout, _SECURITY_CODE_LOCK, function() {
       var code = _getSecurityCode();
       if(code) {
-        _successJSON("最新のセキュリティコードの取得に成功しました", code);
+        _successJSON(res, "最新のセキュリティコードの取得に成功しました", code);
         return true;
       }
-      _errorJSON("最新のセキュリティコードの取得に失敗しました");
+      _errorJSON(res, "最新のセキュリティコードの取得に失敗しました");
       return false;
     })
   }
 
   // 一番古いセキュリティコードを削除.
   o.removeOldSecurityCode = function(req, res, lockTimeout) {
-    if(!__authAdminAccess(req)) {
+    if(!__authAdminAccess(req, res)) {
       return false;
     }
     _baseWrite(req, res, lockTimeout, _SECURITY_CODE_LOCK, function() {
       if(_removeOldSecurityCode()) {
-        _successJSON("一番古いセキュリティコードの削除に成功しました");
+        _successJSON(res, "一番古いセキュリティコードの削除に成功しました");
         return true;
       }
-      _errorJSON("一番古いセキュリティコードの削除に失敗しました");
+      _errorJSON(res, "一番古いセキュリティコードの削除に失敗しました");
       return false;
     })
   }
@@ -1072,12 +1079,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       if(result) {
         var userName = _topFolderName(getUrl(req));
         _baseWrite(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
-          _successJSON("新しいユーザアカウントコードの生成に成功しました", _createAccountCode(userName));
+          _successJSON(res, "新しいユーザアカウントコードの生成に成功しました", _createAccountCode(userName));
           return true;
         });
         return true;
       }
-      _errorJSON("新しいユーザアカウントコードの生成に失敗しました", 401);
+      _errorJSON(res, "新しいユーザアカウントコードの生成に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1090,15 +1097,15 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         var userName = _topFolderName(getUrl(req));
         _baseWrite(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
           if(_removeAccountCode(userName)) {
-            _successJSON("ユーザアカウント情報の削除に成功しました");
+            _successJSON(res, "ユーザアカウント情報の削除に成功しました");
             return true;
           }
-          _errorJSON("ユーザアカウント情報の削除に失敗しました");
+          _errorJSON(res, "ユーザアカウント情報の削除に失敗しました");
           return false;
         });
         return true;
       }
-      _errorJSON("ユーザアカウント情報の削除に失敗しました", 401);
+      _errorJSON(res, "ユーザアカウント情報の削除に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1112,14 +1119,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         _baseRead(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
           var code = _getAccountCode(userName);
           if(code != "") {
-            _successJSON("ユーザアカウント情報の取得に成功しました", code);
+            _successJSON(res, "ユーザアカウント情報の取得に成功しました", code);
             return true;
           }
-          _errorJSON("ユーザアカウント情報の取得に失敗しました");
+          _errorJSON(res, "ユーザアカウント情報の取得に失敗しました");
           return false;
         });
       }
-      _errorJSON("ユーザアカウント情報の取得に失敗しました", 401);
+      _errorJSON(res, "ユーザアカウント情報の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1130,12 +1137,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     _authAdmin(req, function(result) {
       if(result) {
         _baseRead(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
-          _successJSON("ユーザアカウント一覧情報の取得に成功しました", _listAccountCode());
+          _successJSON(res, "ユーザアカウント一覧情報の取得に成功しました", _listAccountCode());
           return true;
         });
         return true;
       }
-      _errorJSON("ユーザアカウント一覧情報の取得に失敗しました", 401);
+      _errorJSON(res, "ユーザアカウント一覧情報の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1147,12 +1154,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       if(result) {
         var userName = _topFolderName(getUrl(req));
         _baseRead(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
-          _successJSON("ユーザアカウント情報の存在確認", _isAccountCode(userName));
+          _successJSON(res, "ユーザアカウント情報の存在確認", _isAccountCode(userName));
           return true;
         });
         return true;
       }
-      _errorJSON("ユーザアカウント情報の存在確認の取得に失敗しました", 401);
+      _errorJSON(res, "ユーザアカウント情報の存在確認の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1161,10 +1168,9 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   o.isExecute = function(req) {
     try {
       var executeType = req.headers[_UACCESS_TYPE];
-      var lockTimeout = req.headers[_UACCESS_TIMEOUT];
       var method = req.method.toLowerCase();
 
-      if(executeType && lockTimeout && method == "get") {
+      if(executeType && method == "get") {
         // 実行処理.
         switch(executeType) {
           case _UACCESS_TYPE_CREATE_ADMIN_CODE:
@@ -1198,7 +1204,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
       // get以外のメソッドはエラー400にする.
       if(method != "get") {
-        _errorJSON("bad request.", 400);
+        _errorJSON(res, "bad request.", 400);
         return;
       }
 
@@ -1235,7 +1241,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       case _UACCESS_TYPE_IS_ACCOUNT_CODE:
         return this.isAccountCode(req, res, lockTimeout);
       }
-      _errorJSON("ヘッダ:" + _UACCESS_TYPE + " の値は存在しないか、内容が不正です:" + executeType);
+      _errorJSON(res, "ヘッダ:" + _UACCESS_TYPE + " の値は存在しないか、内容が不正です:" + executeType);
     } catch(e) {
       http.errorFileResult(500, e, res, closeFlag);
     }
@@ -1252,99 +1258,82 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     return !notCmdFlg;
   }
 
-  // パスコードの登録.
-  cmd.createPassCode = function(code) {
+  // コマンド実行可能で無い場合、エラー返却.
+  var _chkNotCmd = function() {
     if(notCmdFlg) {
       throw new Error("コマンド実行できません");
     }
+  }
+
+  // パスコードの登録.
+  cmd.createPassCode = function(code) {
+    _chkNotCmd();
     _setPassCode(code);
   }
 
   // パスコードの取得.
   cmd.getPassCode = function() {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _getPassCode();
   }
 
   // adminコードの追加.
   cmd.addAdminCode = function() {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _addAdminCode();
   }
 
   // adminコードの削除.
   cmd.removeAdminCode = function(code) {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _removeAdminCode(code);
   }
 
   // adminコードのリスト.
   cmd.getAdminCodeList = function() {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _getAdminCodeList();
   }
 
   // securityコードの追加.
   cmd.addSecurityCode = function() {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _addSecurityCode();
   }
 
   // securityコードの削除.
   cmd.removeSecurityCode = function(code) {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _removeSecurityCode(code);
   }
 
   // securityコードのリスト.
   cmd.getSecurityCodeList = function() {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _getSecurityCodeList();
   }
 
   // ユーザアカウントコードを設定.
   cmd.createAccountCode = function(name) {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _createAccountCode(name);
   }
 
   // ユーザアカウントコードを削除.
   cmd.removeAccountCode = function(name) {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _removeAccountCode(name);
   }
 
   // ユーザアカウントコードを設定.
   cmd.getAccountCode = function(name) {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _getAccountCode(name);
   }
 
   // ユーザアカウントリストを取得.
   cmd.listAccountCode = function() {
-    if(notCmdFlg) {
-      throw new Error("コマンド実行できません");
-    }
+    _chkNotCmd();
     return _listAccountCode();
   }
 

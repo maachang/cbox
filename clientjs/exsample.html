@@ -42,6 +42,15 @@ var $get = function(id) {
   return document.getElementById(id);
 }
 
+// 数値情報かチェック.
+var isNum = function(n) {
+  try {
+    return !isNaN(parseInt(n));
+  } catch(e) {
+  }
+  return false;
+}
+
 // input value を削除.
 var clearInputValue = function(id) {
   var em = $get(id);
@@ -257,6 +266,49 @@ var saveAndSettingAuth = function() {
   alert("アカウント認証: 保存しました");
 }
 
+// authExpire.
+
+// Authシグニチャ用のExpire値データのロード.
+var loadAuthExpireInputValue = function() {
+  _loadInput("authExpire");
+}
+
+// Authシグニチャ用のExpire値のinputデータを取得.
+var getAuthExpireInputValue = function() {
+  return [_getInput("authExpire")]
+}
+
+// Authシグニチャ用のExpire値の保存.
+var saveAuthExpire = function() {
+  var n = null;
+  var v = getAuthExpireInputValue();
+  if(isNum(v[0]) && (n = v[0]|0) > 0) {
+    local.put("authExpire", ""+n);
+  }
+  if(n == null) { 
+    local.put("authExpire", "");
+  }
+}
+
+// Authシグニチャ用のExpire値をcboxにセット.
+var settingAuthExpire = function() {
+  var n = null;
+  var v = getAuthExpireInputValue();
+  if(isNum(v[0]) && (n = v[0]|0) > 0) {
+    cbox.setUAccessExpire(""+n);
+  }
+}
+
+// Authシグニチャ用のExpire値の保存＋登録.
+var saveAndSettingAuthExpire = function() {
+  saveAuthExpire();
+  settingAuthExpire();
+  alert("Authシグニチャ用のExpire値: 保存しました");
+
+  // 再ロード.
+  loadAuthExpireInputValue();
+}
+
 </script>
 
 <p>
@@ -303,6 +355,18 @@ var saveAndSettingAuth = function() {
   <input type="button" value="登録・保存" class="base_button" onclick="saveAndSettingAuth()">
 </p>
 
+<br>
+
+<!-- Expire値. -->
+<p>
+  cbox認証用Expire値(authシグニチャ寿命[ミリ秒設定]) :<br> 
+  　Expire値　　　　　　: <input type="text" value="" id="authExpire" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('authExpire')"><br>
+  <input type="button" value="登録・保存" class="base_button" onclick="saveAndSettingAuthExpire()">
+</p>
+
+<br>
+
 <script>
   // 管理者アカウント認証情報をロード.
   loadAuthAdminAccountInputValue();
@@ -311,6 +375,9 @@ var saveAndSettingAuth = function() {
   // 認証情報をロード.
   loadAuthInputValue();
   settingAuth();
+
+  // Authシグニチャ用のExpire値データのロード.
+  loadAuthExpireInputValue();
 </script>
 
 <br>
@@ -319,7 +386,7 @@ var saveAndSettingAuth = function() {
 <!-- createFolder -->
 <p>
   フォルダ作成 :<br> 
-  URL: <input type="text" value="" id="createFolder" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="createFolder" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('createFolder')">
   &nbsp;<input type="button" value="createFolder" class="base_button" onclick="cbox.createFolder(getUrl('createFolder'), resultCallback)">
 </p>
@@ -329,7 +396,7 @@ var saveAndSettingAuth = function() {
 <!-- removeFolder -->
 <p>
   フォルダ削除 : <br>
-  URL: <input type="text" value="" id="removeFolder" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="removeFolder" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('removeFolder')">
   &nbsp;<input type="button" value="removeFolder" class="base_button" onclick="cbox.removeFolder(getUrl('removeFolder'), resultCallback)">
 </p>
@@ -339,7 +406,7 @@ var saveAndSettingAuth = function() {
 <!-- updateFile -->
 <p>
   ファイルアップデート : <br>
-  URL: <input type="text" value="" id="updateFolder" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="updateFolder" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateFolder');">
   <br>送信ファイル設定 : <input type="file" value="" id="updateFile" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateFile');">
@@ -351,7 +418,7 @@ var saveAndSettingAuth = function() {
 <!-- updateFile -->
 <p>
   データアップデート : <br>
-  URL: <input type="text" value="" id="updateURL" class="base_input_text" max="512" size="50">
+  ＵＲＬ　　　　　: <input type="text" value="" id="updateURL" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateURL');">
   <br>送信ファイル設定 : <input type="text" value="" id="updateData" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateData');">
@@ -363,7 +430,7 @@ var saveAndSettingAuth = function() {
 <!-- getFile -->
 <p>
   ファイル取得 : <br>
-  URL: <input type="text" value="" id="getFile" class="base_input_text" max="512" size="50">
+  ＵＲＬ: <input type="text" value="" id="getFile" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('getFile')">
   &nbsp;<input type="button" value="ファイルを取得" class="base_button" onclick="createTab(getUrl('getFile'))">
 </p>
@@ -373,7 +440,7 @@ var saveAndSettingAuth = function() {
 <!-- removeFile -->
 <p>
   ファイル削除 : <br>
-  URL: <input type="text" value="" id="removeFile" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="removeFile" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('removeFile')">
   &nbsp;<input type="button" value="ファイルを削除" class="base_button" onclick="cbox.removeFile(getUrl('removeFile'), resultCallback)">
 </p>
@@ -383,7 +450,7 @@ var saveAndSettingAuth = function() {
 <!-- getList -->
 <p>
   ファイルリスト取得 : <br>
-  URL: <input type="text" value="" id="getList" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="getList" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('getList')">
   &nbsp;<input type="button" value="リスト取得" class="base_button" onclick="cbox.getList(getUrl('getList'), resultCallback)">
 </p>
@@ -393,7 +460,7 @@ var saveAndSettingAuth = function() {
 <!-- isFile -->
 <p>
   ファイル存在チェック : <br>
-  URL: <input type="text" value="" id="isFile" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="isFile" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('isFile')">
   &nbsp;<input type="button" value="ファイル存在" class="base_button" onclick="cbox.isFile(getUrl('isFile'), resultCallback)">
 </p>
@@ -403,7 +470,7 @@ var saveAndSettingAuth = function() {
 <!-- isFolder -->
 <p>
   フォルダ存在チェック : <br>
-  URL: <input type="text" value="" id="isFolder" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="isFolder" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('isFolder')">
   &nbsp;<input type="button" value="フォルダ存在" class="base_button" onclick="cbox.isFolder(getUrl('isFolder'), resultCallback)">
 </p>
@@ -413,7 +480,7 @@ var saveAndSettingAuth = function() {
 <!-- isLock -->
 <p>
   ロック存在チェック : <br>
-  URL: <input type="text" value="" id="isLock" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="isLock" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('isLock')">
   &nbsp;<input type="button" value="ロック存在" class="base_button" onclick="cbox.isLock(getUrl('isLock'), resultCallback)">
 </p>
@@ -423,9 +490,23 @@ var saveAndSettingAuth = function() {
 <!-- forcedLock -->
 <p>
   ロック強制解除チェック : <br>
-  URL: <input type="text" value="" id="forcedLock" class="base_input_text" max="512" size="50">
+  ＵＲＬ:<input type="text" value="" id="forcedLock" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('forcedLock')">
   &nbsp;<input type="button" value="ロック解除" class="base_button" onclick="cbox.forcedLock(getUrl('forcedLock'), resultCallback)">
+</p>
+
+<br>
+<br>
+<br>
+
+<p>管理者コード：</p>
+
+<br>
+
+<!-- forcedLock -->
+<p>
+  管理者コード生成 : <br>
+  &nbsp;<input type="button" value="生成" class="base_button" onclick="cbox.admin.create('', resultCallback)">
 </p>
 
 <br>
