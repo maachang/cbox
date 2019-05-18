@@ -136,7 +136,6 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     } catch(e) {
       // エラー情報を返却.
       _errorJSON(res, "エラーが発生しました: " + e.message, 500);
-      console.error(e);
     }
   }
 
@@ -794,7 +793,6 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           }
         }
       } catch(e) {
-        console.log(e);
         ret = false;
       } finally {
         // アンロック.
