@@ -9,10 +9,7 @@ html {
 
 body {
   margin-left:1; padding:1;                               /* 基本設定. */
-  -webkit-user-select:none;                               /* タップで、拡大とかさせない. */
   -webkit-tap-highlight-color: rgba(0,0,0,0);           /* アイテム選択時に色づけしない. */
-  -webkit-user-select:none;                               /* テキスト選択をやめる. */
-  -webkit-touch-callout:none;                             /* リンク長押し非ポップアップ. */
   
   position: absolute;
   top: 0;

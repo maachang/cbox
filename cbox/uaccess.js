@@ -134,7 +134,9 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         call(res);
       }
     } catch(e) {
-      console.log(e);
+      // エラー情報を返却.
+      _errorJSON(res, "エラーが発生しました: " + e.message, 500);
+      console.error(e);
     }
   }
 
@@ -153,13 +155,13 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // 正常JSONを返却.
   var _successJSON = function(res, message, value, status) {
     if(!nums.isNumeric(status)) {
-      status = 500;
+      status = 200;
     }
     var json = {result: "success", status: 200, message: message};
     if(value) {
       json.value = value;
     }
-    http.sendJson(res, null, json, 200, notCache, closeFlag);
+    http.sendJson(res, null, json, status, notCache, closeFlag);
   }
 
   // エラーJSONを返却.
@@ -167,10 +169,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     if(!nums.isNumeric(status)) {
       status = 500;
     }
-    http.sendJson(res, null,
-      {result: "error", status: status, message: message},
-      status,
-      notCache, closeFlag);
+    http.errorFileResult(status, message, res, closeFlag);
   }
 
   // パスコードファイル名.
@@ -261,9 +260,6 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // ユーザ管理者コード登録最大数.
   var _UACCESS_ADMIN_CODE_MAX = 25;
 
-  // ユーザ管理者コードメモリ情報(最適化)
-  var _UACCESS_ADMIN_CODE_MEMORY = null;
-
   // ユーザ管理コードを管理するファイル名.
   var _UACCESS_ADMIN_CODE_FILE = "uaccess_admin_code.ual";
 
@@ -308,7 +304,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       var key = fcipher.key(passCode, name);
       var ret = fcipher.dec(code, key, _UACCESS_ADMIN_CODE_HEADER);
       ret = JSON.parse(ret);
-      ret.timeout = res.expire < Date.now();
+      ret.timeout = ret.expire < Date.now();
       return ret;
     } catch(e) {
       throw new Error("管理者コードの認証に失敗しました")
@@ -319,35 +315,27 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var _isAdminCode = function(code) {
     var list = "";
     var name = _UACCESS_FOLDER + "/" + _UACCESS_ADMIN_CODE_FILE;
-    if(_UACCESS_ADMIN_CODE_MEMORY == null) {
-      if(file.isFile(name)) {
-        list = file.readByString(name);
-      }
-      _UACCESS_ADMIN_CODE_MEMORY = list;
+    if(file.isFile(name)) {
+      list = file.readByString(name);
     }
     var checkCode = _START_BRAKE_CODE + code + _END_BREAK_CODE;
-    return _UACCESS_ADMIN_CODE_MEMORY.indexOf(checkCode) != -1;
+    return list.indexOf(checkCode) != -1;
   }
 
   // 新しい管理者コードを１件登録します.
   var _addAdminCode = function() {
     var list = "";
     var name = _UACCESS_FOLDER + "/" + _UACCESS_ADMIN_CODE_FILE;
-    if(_UACCESS_ADMIN_CODE_MEMORY == null) {
-      if(file.isFile(name)) {
-        list = file.readByString(name);
-      }
-      _UACCESS_ADMIN_CODE_MEMORY = list;
+    if(file.isFile(name)) {
+      list = file.readByString(name);
     }
-    list = _UACCESS_ADMIN_CODE_MEMORY;
     if(_getCodeFileByLength(list) > _UACCESS_ADMIN_CODE_MAX) {
-      throw new Error("管理者コードの登録件数が最大値:" +
+      throw new Error("管理者コードの登録件数が最大値: " +
         _UACCESS_ADMIN_CODE_MAX + " を超えているので追加できません");
     }
     var code = uniqueId.code64(uniqueId.getId(_UACCESS_ADMIN_CODE_LENGTH));
     list += _START_BRAKE_CODE + code + _END_BREAK_CODE;
     file.writeByString(name, list);
-    _UACCESS_ADMIN_CODE_MEMORY = list;
     return code;
   }
 
@@ -358,19 +346,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     }
     var list = "";
     var name = _UACCESS_FOLDER + "/" + _UACCESS_ADMIN_CODE_FILE;
-    if(_UACCESS_ADMIN_CODE_MEMORY == null) {
-      if(file.isFile(name)) {
-        list = file.readByString(name);
-      }
-      _UACCESS_ADMIN_CODE_MEMORY = list;
+    if(file.isFile(name)) {
+      list = file.readByString(name);
     }
-    list = _UACCESS_ADMIN_CODE_MEMORY;
     var target = _START_BRAKE_CODE + code + _END_BREAK_CODE;
     var p = list.indexOf(target);
     if(p != -1) {
       list = list.substring(0, p) + list.substring(p + target.length);
       file.writeByString(name, list);
-      _UACCESS_ADMIN_CODE_MEMORY = list;
       return true;
     }
     return false;
@@ -380,20 +363,17 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var _getAdminCodeList = function() {
     var list = "";
     var name = _UACCESS_FOLDER + "/" + _UACCESS_ADMIN_CODE_FILE;
-    if(_UACCESS_ADMIN_CODE_MEMORY == null) {
-      if(file.isFile(name)) {
-        list = file.readByString(name);
-      }
-      _UACCESS_ADMIN_CODE_MEMORY = list;
+    if(file.isFile(name)) {
+      list = file.readByString(name);
     }
-    return _getCodeFileByList(_UACCESS_ADMIN_CODE_MEMORY);
+    return _getCodeFileByList(list);
   }
 
   // 最新の管理者コードを取得.
   var _getAdminCode = function() {
     var ret = _getAdminCodeList();
     if(ret.length > 0) {
-      return ret[0];
+      return ret[ret.length-1];
     }
     return null;
   }
@@ -413,9 +393,6 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // セキュリティコード登録最大数.
   var _UACCESS_SECURITY_CODE_MAX = 25;
 
-  // セキュリティコードメモリ情報(最適化)
-  var _UACCESS_SECURITY_CODE_MEMORY = null;
-
   // セキュリティコードを管理するファイル名.
   var _UACCESS_SECURITY_CODE_FILE = "uaccess_security_code.ual";
 
@@ -428,35 +405,27 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var _isSecurityCode = function(code) {
     var list = "";
     var name = _UACCESS_FOLDER + "/" + _UACCESS_SECURITY_CODE_FILE;
-    if(_UACCESS_SECURITY_CODE_MEMORY == null) {
-      if(file.isFile(name)) {
-        list = file.readByString(name);
-      }
-      _UACCESS_SECURITY_CODE_MEMORY = list;
+    if(file.isFile(name)) {
+      list = file.readByString(name);
     }
     var checkCode = _START_BRAKE_CODE + code + _END_BREAK_CODE;
-    return _UACCESS_SECURITY_CODE_MEMORY.indexOf(checkCode) != -1;
+    return list.indexOf(checkCode) != -1;
   }
 
   // 新しいセキュリティコードを１件登録します.
   var _addSecurityCode = function() {
     var list = "";
     var name = _UACCESS_FOLDER + "/" + _UACCESS_SECURITY_CODE_FILE;
-    if(_UACCESS_SECURITY_CODE_MEMORY == null) {
-      if(file.isFile(name)) {
-        list = file.readByString(name);
-      }
-      _UACCESS_SECURITY_CODE_MEMORY = list;
+    if(file.isFile(name)) {
+      list = file.readByString(name);
     }
-    list = _UACCESS_SECURITY_CODE_MEMORY;
     if(_getCodeFileByLength(list) > _UACCESS_SECURITY_CODE_MAX) {
-      throw new Error("セキュリティコードの登録件数が最大値:" +
+      throw new Error("セキュリティコードの登録件数が最大値: " +
       _UACCESS_SECURITY_CODE_MAX + " を超えているので追加できません");
     }
     var code = uniqueId.code64(uniqueId.getId(_UACCESS_SECURITY_CODE_LENGTH));
     list += _START_BRAKE_CODE + code + _END_BREAK_CODE;
     file.writeByString(name, list);
-    _UACCESS_SECURITY_CODE_MEMORY = list;
     return code;
   }
 
@@ -467,19 +436,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     }
     var list = "";
     var name = _UACCESS_FOLDER + "/" + _UACCESS_SECURITY_CODE_FILE;
-    if(_UACCESS_SECURITY_CODE_MEMORY == null) {
-      if(file.isFile(name)) {
-        list = file.readByString(name);
-      }
-      _UACCESS_SECURITY_CODE_MEMORY = list;
+    if(file.isFile(name)) {
+      list = file.readByString(name);
     }
-    list = _UACCESS_SECURITY_CODE_MEMORY;
     var target = _START_BRAKE_CODE + code + _END_BREAK_CODE;
     var p = list.indexOf(target);
     if(p != -1) {
       list = list.substring(0, p) + list.substring(p + target.length);
       file.writeByString(name, list);
-      _UACCESS_SECURITY_CODE_MEMORY = list;
       return true;
     }
     return false;
@@ -489,13 +453,10 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var _getSecurityCodeList = function() {
     var list = "";
     var name = _UACCESS_FOLDER + "/" + _UACCESS_SECURITY_CODE_FILE;
-    if(_UACCESS_SECURITY_CODE_MEMORY == null) {
-      if(file.isFile(name)) {
-        list = file.readByString(name);
-      }
-      _UACCESS_SECURITY_CODE_MEMORY = list;
+    if(file.isFile(name)) {
+      list = file.readByString(name);
     }
-    return _getCodeFileByList(_UACCESS_SECURITY_CODE_MEMORY);
+    return _getCodeFileByList(list);
   }
 
   // 最新のセキュリティコードを取得.
@@ -522,9 +483,42 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // ユーザアカウントコードキー長(数字羅列の長さ).
   var _UACCESS_ACCOUNT_CODE_LENGTH = 200;
 
+  // ユーザアカウントコードフォルダ.
+  var _UACCOUNT_ACCOUNT_CODE_DIR = "/account/";
+
   // ユーザアカウントコードキー拡張子.
   var _UACCESS_ACCOUNT_CODE_PLUS = ".uac";
   var _UACCESS_ACCOUNT_CODE_PLUS_LEN = _UACCESS_ACCOUNT_CODE_PLUS.length;
+
+  // アカウント格納フォルダを生成.
+  if(!file.isFile(_UACCESS_FOLDER + _UACCOUNT_ACCOUNT_CODE_DIR)) {
+    file.mkdir(_UACCESS_FOLDER + _UACCOUNT_ACCOUNT_CODE_DIR);
+  }
+
+  // ユーザアカウントコード分類フォルダ名を取得.
+  var _accountCodeHeadFolder = function(name) {
+    if(name.length <= 1) {
+      return name;
+    } else {
+      return name.substring(0, 2);
+    }
+  }
+
+  // ユーザアカウントヘッダフォルダを取得.
+  var _getAccountHeaderFolder = function(name) {
+    return _UACCESS_FOLDER + _UACCOUNT_ACCOUNT_CODE_DIR + _accountCodeHeadFolder(name);
+  }
+
+  // ユーザアカウント格納先を取得.
+  var _getAccountFolder = function(name, makeDirFlag) {
+    var head = _getAccountHeaderFolder(name);
+    if(makeDirFlag == true) {
+      if(!file.isDir(head)) {
+        file.mkdir(head);
+      }
+    }
+    return head + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS
+  }
 
   // ユーザアカウント認証コードの作成.
   // name ユーザ名を設定します.
@@ -565,7 +559,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // 戻り値: 対象ユーザのアカウントコードが返却されます.
   var _createAccountCode = function(name) {
     var code = uniqueId.code64(uniqueId.getId(_UACCESS_ACCOUNT_CODE_LENGTH));
-    file.writeByString(_UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS, code);
+    file.writeByString(_getAccountFolder(name, true), code);
     return code;
   }
 
@@ -574,7 +568,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // 
   // 戻り値: 処理結果が返却されます.
   var _removeAccountCode = function(name) {
-    return file.removeFile(_UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS);
+    return file.removeFile(_getAccountFolder(name));
   }
 
   // 指定ユーザのアカウントコードを取得.
@@ -582,7 +576,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // 
   // 戻り値: アカウントコードが返されます.
   var _getAccountCode = function(name) {
-    var fileName = _UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS;
+    var fileName = _getAccountFolder(name);
     if(file.isFile(fileName)) {
       return file.readByString(fileName);
     } else {
@@ -591,21 +585,53 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // 登録されているアカウントコードのユーザID一覧を取得.
+  // pos 取得ポジションを設定します.
+  // endLen 取得サイズを設定します.
   // 
   // 戻り値: [ユーザ名, ユーザ名 .... ]のリストが返却されます.
-  var _listAccountCode = function() {
+  var _listAccountCode = function(pos, endLen) {
+    pos = ((pos|0) <= 0) ? 0 : (pos|0);
+    endLen = ((endLen|0) <= 0) ? -1 : (endLen|0);
     var list = file.list(_UACCESS_FOLDER);
     if(list) {
       var p = -1;
       var name = null;
+      var parentFolder = "";
+      var headFolder = "";
+      var innerList = null;
+      var accontList = null;
       var ret = [];
       var len = list.length;
+      var count = 0;
+      var off = 0;
       for(var i =0 ; i < len; i ++) {
         name = list[i];
-        p = name.lastIndexOf(_UACCESS_ACCOUNT_CODE_PLUS);
-        if (p != -1 && p == name.length - _UACCESS_ACCOUNT_CODE_PLUS_LEN) {
-          ret.push(name.substring(0,name.length - _UACCESS_ACCOUNT_CODE_PLUS_LEN));
+        parentFolder = _UACCESS_FOLDER + "/" + name + "/";
+        var innerList = file.list(parentFolder);
+        if(innerList) {
+          var lenJ = innerList.length;
+          for(var j = 0; j < lenJ; j ++) {
+            name = innerList[j];
+            headFolder = parentFolder + name + "/";
+            accontList = file.list(headFolder);
+            if(accontList && accontList.length > 0) {
+              if(off >= pos) {
+                name = accontList[0];
+                accontList = null;
+                p = name.lastIndexOf(_UACCESS_ACCOUNT_CODE_PLUS);
+                if (p != -1 && p == name.length - _UACCESS_ACCOUNT_CODE_PLUS_LEN) {
+                  ret.push(name.substring(0,name.length - _UACCESS_ACCOUNT_CODE_PLUS_LEN));
+                  count ++;
+                  if(endLen != -1 && count >= endLen) {
+                    return ret;
+                  }
+                }
+              }
+              off ++;
+            }
+          }
         }
+        innerList = null;
       }
       return ret;
     }
@@ -617,7 +643,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // 
   // 戻り値 [true]の場合、アカウント名が登録されています.
   var _isAccountCode = function(name) {
-    var fileName = _UACCESS_FOLDER + "/" + name + _UACCESS_ACCOUNT_CODE_PLUS;
+    var fileName = _getAccountFolder(name);
     return file.isFile(fileName);
   }
 
@@ -768,6 +794,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           }
         }
       } catch(e) {
+        console.log(e);
         ret = false;
       } finally {
         // アンロック.
@@ -1077,7 +1104,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     // 管理者コード認証.
     _authAdmin(req, function(result) {
       if(result) {
-        var userName = _topFolderName(getUrl(req));
+        var userName = _topFolderName(_getUrl(req));
         _baseWrite(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
           _successJSON(res, "新しいユーザアカウントコードの生成に成功しました", _createAccountCode(userName));
           return true;
@@ -1094,7 +1121,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     // 管理者コード認証.
     _authAdmin(req, function(result) {
       if(result) {
-        var userName = _topFolderName(getUrl(req));
+        var userName = _topFolderName(_getUrl(req));
         _baseWrite(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
           if(_removeAccountCode(userName)) {
             _successJSON(res, "ユーザアカウント情報の削除に成功しました");
@@ -1115,7 +1142,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     // 管理者コード認証.
     _authAdmin(req, function(result) {
       if(result) {
-        var userName = _topFolderName(getUrl(req));
+        var userName = _topFolderName(_getUrl(req));
         _baseRead(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
           var code = _getAccountCode(userName);
           if(code != "") {
@@ -1125,6 +1152,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           _errorJSON(res, "ユーザアカウント情報の取得に失敗しました");
           return false;
         });
+        return true;
       }
       _errorJSON(res, "ユーザアカウント情報の取得に失敗しました", 401);
       return false;
@@ -1152,9 +1180,9 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     // 管理者コード認証.
     _authAdmin(req, function(result) {
       if(result) {
-        var userName = _topFolderName(getUrl(req));
+        var userName = _topFolderName(_getUrl(req));
         _baseRead(req, res, lockTimeout, _ACCOUNT_CODE_LOCK, function() {
-          _successJSON(res, "ユーザアカウント情報の存在確認", _isAccountCode(userName));
+          _successJSON(res, "ユーザアカウント情報の存在確認", "" + _isAccountCode(userName));
           return true;
         });
         return true;

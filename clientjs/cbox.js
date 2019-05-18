@@ -1330,7 +1330,7 @@ if(!window["global"]) {
   // 管理者アクセス認証コードを生成.
   var _createAuthAdminAccessCode = function(expire) {
     // パスコードを取得.
-    var passCode = _cboxPassCode
+    var passCode = _cboxPassCode;
     if(passCode == "") {
       passCode = _UACCESS_ADMIN_ACCESS_CODE_KEYCODE;
     } else {
@@ -1507,7 +1507,22 @@ if(!window["global"]) {
 
   // URLからアカウント名を取得.
   var _getUrlByAccount = function(name) {
-    var p = name.indexOf("/");
+    // http://domain/{account}/ から始まる場合.
+    var p = name.indexOf("://");
+    if(p != -1) {
+      p = name.indexOf("/", p + 3);
+      if(p != -1) {
+        p = name.indexOf("/", p);
+        name = name.substring(p+1);
+      } else {
+        throw new Error("URLからアカウント情報の取得に失敗しました");
+      }
+    
+    // /{account}/ のように始まる場合.
+    } else {
+      p = name.indexOf("/");
+    }
+
     if(p == 0) {
       name = name.substring(1);
       if((p = name.indexOf("/", 1)) == -1) {
@@ -1556,8 +1571,8 @@ if(!window["global"]) {
   }
 
   // ユーザアカウントコード一覧を取得.
-  account.list = function(url, result, errorResult, noCache, timeout) {
-    _sendUaccess(url, _UACCESS_TYPE_LIST_ACCOUNT_CODE, _getAuthAdminCodeHeader(_UACCESS_ADMIN_LIST_ACCOUNT),
+  account.list = function(result, errorResult, noCache, timeout) {
+    _sendUaccess(_UACCESS_ADMIN_LIST_ACCOUNT, _UACCESS_TYPE_LIST_ACCOUNT_CODE, _getAuthAdminCodeHeader(_UACCESS_ADMIN_LIST_ACCOUNT),
       null, noCache, timeout, result, errorResult);
   }
 

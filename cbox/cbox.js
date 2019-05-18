@@ -12,6 +12,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var psync = require("../lib/psync")(systemNanoTime);
   var uniqueId = require("../lib/uniqueId");
   var uaccess = require("./uaccess").create(notCache, closeFlag, serverId, systemNanoTime, notCmdFlg);
+  var nums = require("../lib/nums");
 
   // コンフィグ(実行環境用)
   var envConf = null;
@@ -157,12 +158,29 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     return name.substring(0, p);
   }
 
+  // 正常JSONを返却.
+  var _successJSON = function(res, message, value, status) {
+    if(!nums.isNumeric(status)) {
+      status = 200;
+    }
+    var json = {result: "success", status: 200, message: message};
+    if(value) {
+      json.value = value;
+    }
+    http.sendJson(res, null, json, status, notCache, closeFlag);
+  }
+
+  // エラーJSONを返却.
+  var _errorJSON = function(res, message, status) {
+    if(!c.isNumeric(status)) {
+      status = 500;
+    }
+    http.errorFileResult(status, message, res, closeFlag);
+  }
+
   // ロックタイムアウトエラー.
   var _errorLockTimeout = function(url, res, notCache, closeFlag) {
-    http.errorFileResult(500,
-      {message: "ロックタイムアウト:" + url},
-      res,
-      closeFlag);
+    _errorJSON(res, "ロックタイムアウト:" + url)
   }
 
   // リクエストを閉じる処理.
@@ -204,11 +222,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         }
 
         // エラー返却.
-        http.errorFileResult(500,
-          {message: "処理タイプ[" + executeType + "]に対してmethodが POST で処理できません:" + url},
-          res,
-          closeFlag);
-        
+        _errorJSON(res, "処理タイプ[" + executeType + "]に対してmethodが POST で処理できません:" + url);
         ret = false;
       } else if(method == "get") {
 
@@ -232,10 +246,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         uaccess.authAccount(req, function(result) {
           if(result == false) {
             // エラー返却.
-            http.errorFileResult(500,
-              {message: "cboxの処理タイプ " + executeType + " のアクセスには認証が必要です"},
-              res,
-              closeFlag);
+            _errorJSON(res, "cboxの処理タイプ " + executeType + " のアクセスには認証が必要です:" + url);
             return false;
           }
 
@@ -264,11 +275,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           }
 
           // エラー返却.
-          http.errorFileResult(500,
-            {message: "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url},
-            res,
-            closeFlag);
-
+          _errorJSON(res, "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url);
           return false;
         }, null, lockTimeout);
       }
@@ -276,7 +283,6 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       return ret;
     } catch(error) {
       http.errorFileResult(500, error, res, closeFlag);
-
       ret = false;
       return ret;
     } finally {
@@ -301,17 +307,11 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // フォルダ作成失敗.
         } else if(!file.mkdirs(name)) {
-          http.errorFileResult(500,
-            {message: "フォルダの作成に失敗しました:" + url},
-            res,
-            closeFlag);
+          _errorJSON(res, "フォルダの作成に失敗しました:" + url);
           ret = false;
         // 処理成功.
         } else {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "フォルダの作成に成功しました:" + url},
-            200,
-            notCache, closeFlag);
+          _successJSON(res, "フォルダの作成に成功しました:" + url);
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -342,17 +342,11 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // 削除フォルダが存在しない.
         } else if(!file.delete(name)) {
-          http.errorFileResult(500,
-            {message: "フォルダの削除に失敗しました:" + url},
-            res,
-            closeFlag);
+          _errorJSON(res, "フォルダの削除に失敗しました:" + url);
           ret = false;
         // 処理成功.
         } else {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "フォルダの削除に成功しました:" + url},
-            200,
-            notCache, closeFlag);
+          _successJSON(res, "フォルダの削除に成功しました:" + url);
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -387,17 +381,11 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // 同じファイル名で既にフォルダが存在している.
         } else if(file.isDir(name)) {
-          http.errorFileResult(403,
-            {message: "ファイル作成に失敗しました: 同じフォルダ名が存在します:" + url},
-            res,
-            closeFlag);
+          _errorJSON(res, "ファイル作成に失敗しました: 同じフォルダ名が存在します:" + url, 403);
           ret = false;
         // ファイルを設置するフォルダ名が存在しない場合エラー..
         } else if(!file.isDir(_getFolder(name))) {
-          http.errorFileResult(403,
-            {message: "ファイル作成に失敗しました: フォルダが存在しません:" + url},
-            res,
-            closeFlag);
+          _errorJSON(res, "ファイル作成に失敗しました: フォルダが存在しません:" + url, 403);
           ret = false;
         
         // ファイル書き込み.
@@ -441,10 +429,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
             psync.unLock(topName);
 
             // 正常終了を返却.
-            http.sendJson(res, null,
-              {result:"success", status: 200, message: "ファイルの作成に成功しました:" + url, newFile: oldFile == null},
-              200,
-              notCache, closeFlag);
+            _successJSON(res, "ファイルの作成に成功しました:" + url, "" + (oldFile == null));
           });
 
           // 処理中エラー.
@@ -520,10 +505,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           res.end("");
         // ファイルが存在しない場合は404エラー.
         } else if(!file.isFile(name)) {
-          http.errorFileResult(404,
-            {message: "指定ファイルは存在しません:" + url},
-            res,
-            closeFlag);
+          _errorJSON(res, "指定ファイルは存在しません:" + url, 404);
           ret = false;
         
         // ファイル読み込み.
@@ -621,17 +603,11 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // ファイルが存在しない.
         } else if(!file.removeFile(name)) {
-          http.errorFileResult(500,
-            {message: "ファイルの削除に失敗しました:" + url},
-            res,
-            closeFlag);
+          _errorJSON(res, "ファイルの削除に失敗しました:" + url);
           ret = false;
         // 処理成功.
         } else {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "ファイルの削除に成功しました:" + url},
-            200,
-            notCache, closeFlag);
+          _successJSON(res, "ファイルの削除に成功しました:" + url);
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -662,10 +638,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // 指定フォルダが存在しない.
         } else if(!file.isDir(name)) {
-          http.errorFileResult(403,
-            {message: "リスト取得に失敗しました: フォルダではありません: " + url},
-            res,
-            closeFlag);
+          _errorJSON(res, "リスト取得に失敗しました: フォルダではありません:" + url, 403);
           ret = false;
         // リスト一覧取得.
         } else {
@@ -696,10 +669,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           }
 
           // 処理結果返却.
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "リスト取得に成功しました:" + url, parent: url, value: ret},
-            200,
-            notCache, closeFlag);
+          _successJSON(res, "リスト取得に成功しました:" + url, {parent: url, list: ret});
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -733,10 +703,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // 正常処理.
         } else {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "ファイルチェック結果:" + url, value: file.isFile(name)},
-            200,
-            notCache, closeFlag);
+          _successJSON(res, "ファイルチェック結果:" + url, "" + file.isFile(name));
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -767,10 +734,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // 正常処理.
         } else {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "フォルダチェック結果:" + url, value: file.isDir(name)},
-            200,
-            notCache, closeFlag);
+          _successJSON(res, "フォルダチェック結果:" + url, "" + file.isDir(name));
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -802,10 +766,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // 正常処理.
         } else {
-          http.sendJson(res, null,
-            {result:"success", status: 200, message: "ロックチェック結果:" + url, value: psync.isLock(name)},
-            200,
-            notCache, closeFlag);
+          _successJSON(res, "ロックチェック結果:" + url, "" + psync.isLock(name));
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -828,10 +789,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     var topName = _topFolderName(url);
     var ret = true;
     try {
-      http.sendJson(res, null,
-        {result:"success", status: 200, message: "強制ロック解除結果:" + url, value: psync.forcedLock(topName)},
-        200,
-        notCache, closeFlag);
+      _successJSON(res, "強制ロック解除結果:" + url, "" + psync.forcedLock(topName));
     } catch(e) {
       http.errorFileResult(500, e, res, closeFlag);
       ret = false;

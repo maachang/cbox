@@ -32,6 +32,15 @@
 </head>
 <body style="background:#000000;color:#ffffff;">
 
+<style>
+.view_list {
+  border: solid 1px #cfcfcf; font-family: monospace  
+}
+.title {
+  font-size: x-large; font-weight: bolder;
+}
+</style>
+
 <script>
 
 // デフォルトURLヘッド(http://domain).
@@ -40,6 +49,87 @@ var DEF_HEAD_URL = location.protocol + "//" + location.host;
 // Elementに割り当てらてたIDでElementを取得.
 var $get = function(id) {
   return document.getElementById(id);
+}
+
+// Elementに割り当てらてたIDでElementを取得.
+// 中身が空の場合はエラー.
+var $$get = function(id) {
+  var em = document.getElementById(id);
+  if(!em) {
+    alert("指定要素:" + id + " は存在しません");
+    throw new Error();
+  }
+
+  var ret = em.value;
+  if(!ret || ret == "") {
+    alert("指定要素:" + id + " 内容が入力されていません");
+    throw new Error();
+  }
+  return ret;
+}
+
+// 要素の情報を削除.
+var clearInnerHTML = function(id, addBr) {
+  var em = $get(id);
+  if(em) {
+    addBr = addBr|0;
+    if(addBr > 10) {
+      addBr = 10;
+    }
+    var br = "";
+    for(var i = 0; i < addBr; i ++) {
+      br += "<br>";
+    }
+    em.innerHTML = br;
+  }
+}
+
+// ゼロサプレス.
+var headZero = function(size, code) {
+  size = size|0;
+  var head = "";
+  for(var i = 0; i < size ; i ++) {
+    head += "0";
+  }
+  var code = "" + code;
+  return head.substring(code.length) + code;
+}
+
+// Unix時間を整形.
+var toDateString = function(unixTime) {
+  var d = new Date(unixTime);
+  return d.getFullYear() + "/" +
+    headZero(2, (d.getMonth() + 1)) + "/" +
+    headZero(2, d.getDate()) + " " +
+    headZero(2, d.getHours()) + ":" +
+    headZero(2, d.getMinutes()) + ":" +
+    headZero(2, d.getSeconds());
+}
+
+// 数字を見やすく変換(整数).
+var numYen = function(n) {
+  n = "" + n;
+  var minus = false;
+  if(n.charAt(0) == "-") {
+    n = n.substring(1);
+    minus = true;
+  }
+  var ret = "";
+  var cnt = 0;
+  for(var i = n.length-1 ; i >= 0; i--) {
+    ret = n.charAt(i) + ret;
+    if(cnt >= 3 ) {
+      cnt = 0;
+      if(i != 0) {
+        ret = "," + ret;
+      }
+    }
+    cnt ++;
+  }
+  if(minus) {
+    ret = "-" + ret;
+  }
+  return ret;
 }
 
 // 数値情報かチェック.
@@ -167,6 +257,36 @@ var _getInput = function(id) {
   return (n.length == 0) ? "" : n;
 }
 
+// リスト結果をdivタグに表示させる形式で取得.
+var resultListByDiv = function(list, name) {
+  var len = list.length;
+  var view = "";
+  if(len == 0) {
+    view = "<br>";
+  } else {
+    for(var i = 0; i < len; i++) {
+      if(i != 0) {
+        view += "<br>";
+      }
+      view += "(" + headZero(2, i+1) + "):&nbsp;&nbsp;&nbsp;&nbsp;" + list[i];
+    }
+  }
+  $get(name).innerHTML = view;
+}
+
+</script>
+
+<p>
+  http://domain の入力を省略すると、現在接続中のcboxにアクセスします.<br>
+  また、先頭の / を省略しても / が設定されます.<br>
+  <br>
+  cboxのルールとしてURLの形式は /ユーザ名/フォルダ名/フォルダ名/ファイル名 のような感じになります.<br>
+  ユーザ名配下に「読み込み処理以外」のアクセスに対して、cbox認証が必要となります.<br>
+</p>
+
+<br>
+
+<script>
 // authAdminAccountUUID, authPassCode
 
 // 管理者アカウント認証データのロード.
@@ -203,7 +323,7 @@ var saveAndSettingAuthAdminAccount = function() {
 // authAdminCode.
 
 // 管理者認証データのロード.
-var loadAuthAdminAccountInputValue = function() {
+var loadAuthAdminInputValue = function() {
   _loadInput("authAdminCode");
 }
 
@@ -221,7 +341,7 @@ var saveAuthAdmin = function() {
 // 管理者認証データをcboxにセット.
 var settingAuthAdmin = function() {
   var v = getAuthAdminInputValue();
-  cbox.admin.setAuthInfo(v[0]);
+  cbox.account.setAuthInfo(v[0]);
 }
 
 // 管理者認証データの保存＋登録.
@@ -308,16 +428,9 @@ var saveAndSettingAuthExpire = function() {
   // 再ロード.
   loadAuthExpireInputValue();
 }
-
 </script>
 
-<p>
-  http://domain の入力を省略すると、現在接続中のcboxにアクセスします.<br>
-  また、先頭の / を省略しても / が設定されます.<br>
-  <br>
-  cboxのルールとしてURLの形式は /ユーザ名/フォルダ名/フォルダ名/ファイル名 のような感じになります.<br>
-  ユーザ名配下に「読み込み処理以外」のアクセスに対して、cbox認証が必要となります.<br>
-</p>
+<p class="title">[[cboxアクセス設定]]</p>
 
 <br>
 
@@ -372,15 +485,26 @@ var saveAndSettingAuthExpire = function() {
   loadAuthAdminAccountInputValue();
   settingAuthAdminAccount();
 
+  // 管理認証情報をロード.
+  loadAuthAdminInputValue();
+  settingAuthAdmin();
+
   // 認証情報をロード.
   loadAuthInputValue();
   settingAuth();
 
   // Authシグニチャ用のExpire値データのロード.
   loadAuthExpireInputValue();
+  settingAuthExpire();
+
 </script>
 
 <br>
+<br>
+<br>
+
+<p class="title">[[cboxストレージ設定]]</p>
+
 <br>
 
 <!-- createFolder -->
@@ -448,11 +572,45 @@ var saveAndSettingAuthExpire = function() {
 <br>
 
 <!-- getList -->
+<script>
+  var resultStorageList = function(status, result) {
+    if(status != 200) {
+    alert("カレントフォルダ一覧取得に失敗:" + result);
+    return false;
+  }
+  try {
+    result = JSON.parse(result);
+  } catch(e) {
+    alert("カレントフォルダ一覧取得に失敗:" + e);
+    return false;
+  }
+  var space = "&nbsp;&nbsp;&nbsp;&nbsp;";
+  var list = result.value.list;
+  var len = list.length;
+  var view = "[" + result.value.parent + "]<br>";
+  for(var i = 0; i < len; i++) {
+    if(i != 0) {
+      view += "<br>";
+    }
+    view += "(" + headZero(2, i+1) + "):" +
+      space + (list[i].isFile ? "[FILE]" : "[DIR ]") +
+      space + "time: " + toDateString(list[i].fileTime) +
+      space + "size: " + numYen(headZero(12, list[i].fileSize)) + " byte" + 
+      space + "name: " + list[i].name ;
+  }
+  $get("resultStorageListView").innerHTML = view;
+  return true;
+  }
+</script>
 <p>
   ファイルリスト取得 : <br>
   ＵＲＬ:<input type="text" value="" id="getList" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('getList')">
-  &nbsp;<input type="button" value="リスト取得" class="base_button" onclick="cbox.getList(getUrl('getList'), resultCallback)">
+  &nbsp;<input type="button" value="リスト取得" class="base_button" onclick="cbox.getList(getUrl('getList'), resultStorageList)">
+  &nbsp;<input type="button" value="リストクリア" class="base_button" onclick="clearInnerHTML('resultStorageListView', 1)">
+  <div id="resultStorageListView" class="view_list">
+    <br>
+  </div>
 </p>
 
 <br>
@@ -499,11 +657,11 @@ var saveAndSettingAuthExpire = function() {
 <br>
 <br>
 
-<p>管理者コード：</p>
+<p class="title">[[cbox管理者コード設定]]</p>
 
 <br>
 
-<!-- forcedLock -->
+<!-- createAdminAccount -->
 <p>
   管理者コード生成 : <br>
   &nbsp;<input type="button" value="生成" class="base_button" onclick="cbox.admin.create('', resultCallback)">
@@ -511,5 +669,199 @@ var saveAndSettingAuthExpire = function() {
 
 <br>
 
+<!-- removeAdminAccount -->
+<p>
+  管理者コード削除: <br>
+  管理者コード:<input type="text" value="" id="removeAdminAccount" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('removeAdminAccount')">
+  &nbsp;<input type="button" value="管理者コード削除" class="base_button" onclick="cbox.admin.remove('', $$get('removeAdminAccount'), resultCallback)">
+</p>
+
+<br>
+
+<!-- listAdminAccount -->
+<script>
+var resultListAdminAccount = function(status, result) {
+  if(status != 200) {
+    alert("管理者コード一覧取得に失敗:" + result);
+    return false;
+  }
+  try {
+    result = JSON.parse(result).value;
+
+  } catch(e) {
+    alert("管理者コード一覧取得に失敗:" + e);
+    return false;
+  }
+  resultListByDiv(result, "resultListAdminAccountView");
+  return true;
+}
+</script>
+<p>
+  管理者コード一覧取得 : <br>
+  &nbsp;<input type="button" value="リスト取得" class="base_button" onclick="cbox.admin.list('', resultListAdminAccount)">
+  &nbsp;<input type="button" value="リストクリア" class="base_button" onclick="clearInnerHTML('resultListAdminAccountView', 1)">
+  <div id="resultListAdminAccountView" class="view_list">
+    <br>
+  </div>
+</p>
+  
+<br>
+
+<!-- firstAdminAccount -->
+<p>
+  最新管理者コード取得. : <br>
+  &nbsp;<input type="button" value="最新" class="base_button" onclick="cbox.admin.getFirst('', resultCallback)">
+</p>
+
+<br>
+
+<!-- 最古AdminAccount -->
+<p>
+  最古管理者コード削除. : <br>
+  &nbsp;<input type="button" value="最古削除" class="base_button" onclick="cbox.admin.removeLast('', resultCallback)">
+</p>
+
+<br><br><br>
+
+<p class="title">[[cboxセキュリティコード設定]]</p>
+
+<br>
+
+<!-- createSecurityAccount -->
+<p>
+    セキュリティコード生成 : <br>
+  &nbsp;<input type="button" value="生成" class="base_button" onclick="cbox.security.create('', resultCallback)">
+</p>
+
+<br>
+
+<!-- removeSecurityAccount -->
+<p>
+    セキュリティコード削除: <br>
+    セキュリティコード:<input type="text" value="" id="removeSecurityAccount" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('removeSecurityAccount')">
+  &nbsp;<input type="button" value="セキュリティコード削除" class="base_button" onclick="cbox.security.remove('', $$get('removeSecurityAccount'), resultCallback)">
+</p>
+
+<br>
+
+<!-- listSecurityAccount -->
+<script>
+var resultListSecurityAccount = function(status, result) {
+  if(status != 200) {
+    alert("セキュリティコード一覧取得に失敗:" + result);
+    return false;
+  }
+  try {
+    result = JSON.parse(result).value;
+
+  } catch(e) {
+    alert("セキュリティコード一覧取得に失敗:" + e);
+    return false;
+  }
+  resultListByDiv(result, "resultListSecurityAccountView");
+  return true;
+}
+</script>
+<p>
+    セキュリティコード一覧取得 : <br>
+  &nbsp;<input type="button" value="リスト取得" class="base_button" onclick="cbox.security.list('', resultListSecurityAccount)">
+  &nbsp;<input type="button" value="リストクリア" class="base_button" onclick="clearInnerHTML('resultListSecurityAccountView', 1)">
+  <div id="resultListSecurityAccountView" class="view_list">
+    <br>
+  </div>
+</p>
+  
+<br>
+
+<!-- firstSecurityAccount -->
+<p>
+    セキュリティコード取得. : <br>
+  &nbsp;<input type="button" value="最新" class="base_button" onclick="cbox.security.getFirst('', resultCallback)">
+</p>
+
+<br>
+
+<!-- 最古AdminAccount -->
+<p>
+  最古セキュリティコード削除. : <br>
+  &nbsp;<input type="button" value="最古削除" class="base_button" onclick="cbox.security.removeLast('', resultCallback)">
+</p>
+
+<br><br><br>
+
+<p class="title">[[cboxユーザアカウント設定]]</p>
+
+<br>
+
+<!-- createUserAccount -->
+<p>
+    ユーザアカウント生成: <br>
+    ＵＲＬ:<input type="text" value="" id="createUserAccount" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('createUserAccount')">
+  &nbsp;<input type="button" value="生成" class="base_button" onclick="cbox.account.create(getUrl('createUserAccount'), resultCallback)">
+</p>
+
+<br>
+
+<!-- removeUserAccount -->
+<p>
+    ユーザアカウント削除: <br>
+    ＵＲＬ:<input type="text" value="" id="removeUserAccount" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('removeUserAccount')">
+  &nbsp;<input type="button" value="削除" class="base_button" onclick="cbox.account.remove(getUrl('removeUserAccount'), resultCallback)">
+</p>
+
+<br>
+
+<!-- getUserAccount -->
+<p>
+    ユーザアカウント取得: <br>
+    ＵＲＬ:<input type="text" value="" id="getUserAccount" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('getUserAccount')">
+  &nbsp;<input type="button" value="取得" class="base_button" onclick="cbox.account.get(getUrl('getUserAccount'), resultCallback)">
+</p>
+
+<br>
+
+<!-- listUserAccount -->
+<script>
+  var resultListUserAccount = function(status, result) {
+    if(status != 200) {
+      alert("ユーザアカウント一覧取得に失敗:" + result);
+      return false;
+    }
+    try {
+      result = JSON.parse(result).value;
+  
+    } catch(e) {
+      alert("ユーザアカウント一覧取得に失敗:" + e);
+      return false;
+    }
+    resultListByDiv(result, "resultListUserAccountView");
+    return true;
+  }
+</script>
+<p>
+  ユーザアカウント一覧 : <br>
+  &nbsp;<input type="button" value="リスト取得" class="base_button" onclick="cbox.account.list(resultListUserAccount)">
+  &nbsp;<input type="button" value="リストクリア" class="base_button" onclick="clearInnerHTML('resultListUserAccountView', 1)">
+  <div id="resultListUserAccountView" class="view_list">
+    <br>
+  </div>
+</p>
+  
+<br>
+
+<!-- isUserAccount -->
+<p>
+    ユーザアカウント存在確認: <br>
+    ＵＲＬ:<input type="text" value="" id="isUserAccount" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('isUserAccount')">
+  &nbsp;<input type="button" value="取得" class="base_button" onclick="cbox.account.isAccount(getUrl('isUserAccount'), resultCallback)">
+</p>
+
+<br><br><br><br><br><br><br><br><br><br>
 </body>
 </html>
