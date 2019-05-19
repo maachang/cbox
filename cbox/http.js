@@ -60,7 +60,19 @@ module.exports = (function () {
   var _errorFileResult = function(status, err, res, notCache, closeFlag) {
     var headers = {};
     var body = "";
-    if (status >= 500) {
+    var message = null;
+
+    // fs.statでファイルが見つからないエラーの場合.
+    if (err && err.code && err.code == 'ENOENT') {
+      status = 404;
+      message = "not found";
+    } else if(err) {
+      if(err.message) {
+        message = err.message;
+      } else {
+        message = "" + err;
+      }
+    } else if (status >= 500) {
       if(err != null) {
         console.error("status:" + status, err);
       } else {
@@ -70,12 +82,12 @@ module.exports = (function () {
     // 静的ファイルでも、JSONエラーを返却させる.
     headers['Content-Type'] = "text/javascript; charset=utf-8;";
     body = "{\"result\": \"error\", \"status\": " + status;
-    if(err) {
-      body += ", \"message\": \"" + err["message"] + "\"}";
+    if(message) {
+      body += ", \"message\": \"" + message + "\"}";
     } else {
       body += "}";
     }
-
+    // 送信処理.
     try {
       _setCrosHeader(headers, _utf8Length(body), notCache, closeFlag);
       res.writeHead(status, headers);

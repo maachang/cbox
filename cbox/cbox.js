@@ -172,7 +172,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
   // エラーJSONを返却.
   var _errorJSON = function(res, message, status) {
-    if(!c.isNumeric(status)) {
+    if(!nums.isNumeric(status)) {
       status = 500;
     }
     http.errorFileResult(status, message, res, closeFlag);
@@ -370,7 +370,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     var topName = _topFolderName(url);
     psync.lock(topName, lockTimeout, function(successFlag) {
       var ret = true;
-      var notUnlock = false;
+      var eventFlag = false;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
@@ -404,8 +404,8 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           // データ書き込み先.
           var out = fs.createWriteStream(name);
 
-          // アンロックは、データ受信後に行う.
-          notUnlock = true;
+          // イベント処理開始.
+          eventFlag = true;
 
           // データ書き込み中.
           req.on("data", function (chunk) {
@@ -457,7 +457,6 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
             // リクエストを閉じる.
             _closeReq(req);
-            console.debug(err);
           });
         }
       } catch(e) {
@@ -465,13 +464,13 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         var ret = false;
       } finally {
 
-        // アンロックが必要な場合は解除.
-        if(!notUnlock) {
+        // イベント側で処理しない場合.
+        if(!eventFlag) {
           psync.unLock(topName);
-        }
-        if(!ret) {
-          // リクエストを閉じる.
-          _closeReq(req);
+          if(!ret) {
+            // リクエストを閉じる.
+            _closeReq(req);
+          }
         }
       }
       return ret;
@@ -485,7 +484,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     var topName = _topFolderName(url);
     psync.readLock(topName, lockTimeout, function(successFlag) {
       var ret = true;
-      var notUnlock = false;
+      var statFlag = false;
       try {
         // ロックタイムアウト.
         if(!successFlag) {
@@ -510,76 +509,88 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         
         // ファイル読み込み.
         } else {
+          // 非同期statで処理するので、ここでは後処理は行わない.
+          statFlag = true;
 
-          // キャッシュありのチェック.
-          var stat = file.stat(name);
-          var headers = {};
-          var mime = http.mimeType(name, envConf);
-          var mtime = new Date(stat.mtime.getTime());
-
-          // ヘッダ情報をセット.
-          headers['Content-Type'] = mime;
-          headers['Last-Modified'] = http.toRfc822(mtime);
-
-          // キャッシュ情報の場合.
-          // notCache = true の場合はキャッシュは取らない.
-          if (!notCache && req.headers["if-modified-since"] && http.isCache(mtime, req.headers["if-modified-since"])) {
-            // クロスヘッダ対応. 
-            http.setCrosHeader(headers, 0, notCache, closeFlag);
-            res.writeHead(304, headers);
-            res.end("");
-          } else {
-
-            // キャッシュなしの場合.
+          // ファイル存在チェック.
+          fs.stat(name, function(err, stat) {
+            var eventFlag = false;
             try {
-              // クロスヘッダ対応.
-              http.setCrosHeader(headers, stat.size, notCache, closeFlag);
-              res.writeHead(200, headers);
+              // エラー処理.
+              if (err) throw err;
 
-              // ファイルの返信は「生データ」を返却.
-              var rs = fs.createReadStream(name);
+              var headers = {};
+              var mime = http.mimeType(name, envConf);
+              var mtime = new Date(stat.mtime.getTime());
 
-              // アンロックは、データ返信後に行う.
-              notUnlock = true;
+              // ヘッダ情報をセット.
+              headers['Content-Type'] = mime;
+              headers['Last-Modified'] = http.toRfc822(mtime);
 
-              rs.on('data', function (data) {
-                res.write(data);
-              });
-              rs.on('end', function () {
-                res.end();
+              // キャッシュ情報の場合.
+              // notCache = true の場合はキャッシュは取らない.
+              if (!notCache && req.headers["if-modified-since"] && http.isCache(mtime, req.headers["if-modified-since"])) {
+                // クロスヘッダ対応. 
+                http.setCrosHeader(headers, 0, notCache, closeFlag);
+                res.writeHead(304, headers);
+                res.end("");
+              } else {
 
-                // アンロック.
-                psync.readUnLock(topName);
-              });
-              rs.on("error", function(err) {
-                try { res.end(); } catch(e) {}
-                try { rs.close(); } catch(e) {}
+                // クロスヘッダ対応.
+                http.setCrosHeader(headers, stat.size, notCache, closeFlag);
+                res.writeHead(200, headers);
 
-                // アンロック.
-                psync.readUnLock(topName);
+                // ファイルの返信は「生データ」を返却.
+                var rs = fs.createReadStream(name);
 
-                // リクエストを閉じる.
-                _closeReq(req);
-                console.debug(err);
-              })
-            } catch(e) {
+                // イベント開始.
+                eventFlag = true;
+
+                rs.on('data', function (data) {
+                  res.write(data);
+                });
+                rs.on('end', function () {
+                  res.end();
+
+                  // アンロック.
+                  psync.readUnLock(topName);
+                });
+                rs.on("error", function(err) {
+                  try { res.end(); } catch(e) {}
+                  try { rs.close(); } catch(e) {}
+
+                  // アンロック.
+                  psync.readUnLock(topName);
+
+                  // リクエストを閉じる.
+                  _closeReq(req);
+                })
+              }
+            }catch(e) {
               http.errorFileResult(500, e, res, closeFlag);
               ret = false;
+            } finally {
+              if(!eventFlag) {
+                psync.readUnLock(topName);
+                if(!ret) {
+                  // リクエストを閉じる.
+                  _closeReq(req);
+                }
+              }
             }
-          }
+          });
         }
-
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
         ret = false;
       } finally {
-        // アンロックが必要な場合は解除.
-        if(!notUnlock) {
+        // statで処理していない場合.
+        if(!statFlag) {
           psync.readUnLock(topName);
-        }
-        if(!ret) {
-          // リクエストを閉じる.
-          _closeReq(req);
+          if(!ret) {
+            // リクエストを閉じる.
+            _closeReq(req);
+          }
         }
       }
       return ret;
