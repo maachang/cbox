@@ -1,4 +1,4 @@
-// console msful.
+// cbox-cmd.
 //
 
 module.exports.create = function(cmdName, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime) {
@@ -139,7 +139,11 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         context = null;
         return true;
       } catch(e) {
-        console.log(e, e);
+        if(e["message"]) {
+          console.log(e.message);
+        } else {
+          console.log(""+e);
+        }
         return false;
       }
     }
