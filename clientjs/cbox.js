@@ -229,159 +229,6 @@ if(!window["global"]) {
       return r;
     }
 
-    // 割符コード.
-    var tally = (function() {
-      var _CODE = [59, 95, 36, 58, 37, 47, 38, 46, 61, 42, 44, 45, 126, 35, 94, 64];
-      var _HEAD = 64;
-      var _CHECK = 33;
-      var _APPEND_CHECK = 124;
-      var rand = _Xor128(new Date().getTime()+1) ;
-      (function(){
-        var n = "";
-        var _x = function(a) {return String.fromCharCode(a);}
-        for(var i = 0;i < _CODE.length; i ++) n += _x(_CODE[i]);
-        _CODE = n;
-        _HEAD = _x(_HEAD);
-        _CHECK = _x(_CHECK);
-        _APPEND_CHECK = _x(_APPEND_CHECK);
-      })();
-      var o = {};
-      
-      // エンコード.
-      o.enc = function(value, check) {
-        if(typeof(check) == "string" && check.length > 0) {
-          value += _CHECK + CBase64.encode(check);
-        }
-        value = _utf8ToBinary(value, 0, value.length) ;  
-        var i,j,n,m,c,t ;
-        var len = value.length ;
-        var allLen = ( len << 1 ) + 2 ;
-        var v = new Array( allLen ) ;
-        
-        m = 255 ;
-        v[ 0 ] = rand.nextInt() & m ;
-        
-        for( var i = 0 ; i < len ; i ++ ) {
-            v[ 1 + ( i << 1 ) ] = value[ i ] ;
-            v[ 2 + ( i << 1 ) ] = rand.nextInt() & m ;
-        }
-          v[ allLen-1 ] = rand.nextInt() & m ;
-          
-          len = allLen - 1 ;
-          for( i = 0,t = 0 ; i < len ; i += 2 ) {
-            n = v[ i ] ;
-            if( ( t ++ ) & 1 == 0 ) {
-              n = ~n ;
-            }
-            for( j = i+1 ; j < len ; j += 2 ) {
-              v[ j ] = ( v[ j ] ^ n ) & m ;
-            }
-          }
-          n = v[ 0 ] ;
-          for( i = 1 ; i < len ; i ++ ) {
-            v[ i ] = ( ( i & 1 == 0 ) ?
-              v[ i ] ^ n :
-              v[ i ] ^ (~n) )
-              & m ;
-          }
-          n = v[ len ] ;
-          for( i = len-1 ; i >= 0 ; i -- ) {
-            v[ i ] = ( ( i & 1 == 0 ) ?
-              v[ i ] ^ (~n) :
-              v[ i ] ^ n )
-              & m ;
-          }
-          c = _CODE ;
-          var buf = "";
-          for( i = 0 ; i < allLen ; i ++ ) {
-            n = v[ i ] ;
-            for( j = 0 ; j < 2 ; j ++ ) {
-              buf += ( c.charAt( ( n & ( 0x0f << ( j << 2 ) ) ) >> ( j << 2 ) ) ) ;
-            }
-          }
-          if(typeof(check) == "string" && check.length > 0) {
-            return _HEAD + buf + _APPEND_CHECK;
-          }
-          return _HEAD + buf;
-      }
-      
-      // デコード.
-      o.dec = function( value,check ) {
-        var useCheck = false;
-        var ret = null;
-        try {
-          if( !(typeof(value) == "string" && value.length > 0) ||
-            value.charAt( 0 ) != _HEAD ||
-            value.length & 1 == 0 ) {
-            return null ;
-          }
-          if(value[value.length-1] == _APPEND_CHECK) {
-            useCheck = true;
-            value = value.substring(0,value.length-1);
-          }
-          var i,j,k,a,b,c,m,n,t ;
-          var len = value.length ;
-          var v = new Array( (len-1) >> 1 ) ;
-          m = 255 ;
-          c = _CODE ;
-          for( i = 1,k = 0 ; i < len ; i += 2 ) {
-            a = c.indexOf( value.charAt( i ) ) ;
-            b = c.indexOf( value.charAt( i+1 ) ) ;
-            if( a == -1 || b == -1 ) {
-              return null ;
-            }
-            v[ k ++ ] = ( a | ( b << 4 ) ) & m ;
-          }
-          len = v.length - 1 ;
-          n = v[ len ] ;
-          for( i = len-1 ; i >= 0 ; i -- ) {
-            v[ i ] = ( ( i & 1 == 0 ) ?
-              v[ i ] ^ (~n) :
-              v[ i ] ^ n )
-              & m ;
-          }
-          n = v[ 0 ] ;
-          for( i = 1 ; i < len ; i ++ ) {
-            v[ i ] = ( ( i & 1 == 0 ) ?
-              v[ i ] ^ n :
-              v[ i ] ^ (~n) )
-              & m ;
-          }
-          for( i = 0,t = 0 ; i < len ; i += 2 ) {
-            n = v[ i ] ;
-            if( ( t ++ ) & 1 == 0 ) {
-              n = ~n ;
-            }
-            for( j = i+1 ; j < len ; j += 2 ) {
-              v[ j ] = ( v[ j ] ^ n ) & m ;
-            }
-          }
-          var cnt = 0 ;
-          var vv = new Array( (len>>1)-1 ) ;
-          for( i = 1 ; i < len ; i += 2 ) {
-            vv[ cnt++ ] = v[ i ] ;
-          }
-          ret = _binaryToUTF8(vv, 0, vv.length) ;
-        } catch(e) {
-          throw new Error("Analysis failed.");
-        }
-        
-        if(typeof(check) == "string" && check.length > 0) {
-          check = CBase64.encode(check);
-          var p = ret.lastIndexOf(_CHECK + check);
-          if(p == -1 || (ret.length - p) != check.length + 1) {
-            throw new Error("Check codes do not match.");
-          }
-          return ret.substring(0,ret.length-(check.length + 1));
-        } else if(useCheck) {
-          throw new Error("Analysis failed.");
-        }
-        return ret;
-      }
-      return o;
-    })();
-    _tally = tally;
-
     // 256フリップ.
     var _flip = function(pause, step) {
       switch (step & 0x00000007) {
@@ -531,6 +378,159 @@ if(!window["global"]) {
         (((n[3] & 0xff000000) >> 24) & 0x00ff)
       ]
     }
+
+    // 割符コード.
+    var tally = (function() {
+      var _CODE = [59, 95, 36, 58, 37, 47, 38, 46, 61, 42, 44, 45, 126, 35, 94, 64];
+      var _HEAD = 64;
+      var _CHECK = 33;
+      var _APPEND_CHECK = 124;
+      var rand = _Xor128(new Date().getTime()+1) ;
+      (function(){
+        var n = "";
+        var _x = function(a) {return String.fromCharCode(a);}
+        for(var i = 0;i < _CODE.length; i ++) n += _x(_CODE[i]);
+        _CODE = n;
+        _HEAD = _x(_HEAD);
+        _CHECK = _x(_CHECK);
+        _APPEND_CHECK = _x(_APPEND_CHECK);
+      })();
+      var o = {};
+      
+      // エンコード.
+      o.enc = function(value, check) {
+        if(typeof(check) == "string" && check.length > 0) {
+          value += _CHECK + fhash(check);
+        }
+        value = _utf8ToBinary(value, 0, value.length) ;  
+        var i,j,n,m,c,t ;
+        var len = value.length ;
+        var allLen = ( len << 1 ) + 2 ;
+        var v = new Array( allLen ) ;
+        
+        m = 255 ;
+        v[ 0 ] = rand.nextInt() & m ;
+        
+        for( var i = 0 ; i < len ; i ++ ) {
+            v[ 1 + ( i << 1 ) ] = value[ i ] ;
+            v[ 2 + ( i << 1 ) ] = rand.nextInt() & m ;
+        }
+          v[ allLen-1 ] = rand.nextInt() & m ;
+          
+          len = allLen - 1 ;
+          for( i = 0,t = 0 ; i < len ; i += 2 ) {
+            n = v[ i ] ;
+            if( ( t ++ ) & 1 == 0 ) {
+              n = ~n ;
+            }
+            for( j = i+1 ; j < len ; j += 2 ) {
+              v[ j ] = ( v[ j ] ^ n ) & m ;
+            }
+          }
+          n = v[ 0 ] ;
+          for( i = 1 ; i < len ; i ++ ) {
+            v[ i ] = ( ( i & 1 == 0 ) ?
+              v[ i ] ^ n :
+              v[ i ] ^ (~n) )
+              & m ;
+          }
+          n = v[ len ] ;
+          for( i = len-1 ; i >= 0 ; i -- ) {
+            v[ i ] = ( ( i & 1 == 0 ) ?
+              v[ i ] ^ (~n) :
+              v[ i ] ^ n )
+              & m ;
+          }
+          c = _CODE ;
+          var buf = "";
+          for( i = 0 ; i < allLen ; i ++ ) {
+            n = v[ i ] ;
+            for( j = 0 ; j < 2 ; j ++ ) {
+              buf += ( c.charAt( ( n & ( 0x0f << ( j << 2 ) ) ) >> ( j << 2 ) ) ) ;
+            }
+          }
+          if(typeof(check) == "string" && check.length > 0) {
+            return _HEAD + buf + _APPEND_CHECK;
+          }
+          return _HEAD + buf;
+      }
+      
+      // デコード.
+      o.dec = function( value,check ) {
+        var useCheck = false;
+        var ret = null;
+        try {
+          if( !(typeof(value) == "string" && value.length > 0) ||
+            value.charAt( 0 ) != _HEAD ||
+            value.length & 1 == 0 ) {
+            return null ;
+          }
+          if(value[value.length-1] == _APPEND_CHECK) {
+            useCheck = true;
+            value = value.substring(0,value.length-1);
+          }
+          var i,j,k,a,b,c,m,n,t ;
+          var len = value.length ;
+          var v = new Array( (len-1) >> 1 ) ;
+          m = 255 ;
+          c = _CODE ;
+          for( i = 1,k = 0 ; i < len ; i += 2 ) {
+            a = c.indexOf( value.charAt( i ) ) ;
+            b = c.indexOf( value.charAt( i+1 ) ) ;
+            if( a == -1 || b == -1 ) {
+              return null ;
+            }
+            v[ k ++ ] = ( a | ( b << 4 ) ) & m ;
+          }
+          len = v.length - 1 ;
+          n = v[ len ] ;
+          for( i = len-1 ; i >= 0 ; i -- ) {
+            v[ i ] = ( ( i & 1 == 0 ) ?
+              v[ i ] ^ (~n) :
+              v[ i ] ^ n )
+              & m ;
+          }
+          n = v[ 0 ] ;
+          for( i = 1 ; i < len ; i ++ ) {
+            v[ i ] = ( ( i & 1 == 0 ) ?
+              v[ i ] ^ n :
+              v[ i ] ^ (~n) )
+              & m ;
+          }
+          for( i = 0,t = 0 ; i < len ; i += 2 ) {
+            n = v[ i ] ;
+            if( ( t ++ ) & 1 == 0 ) {
+              n = ~n ;
+            }
+            for( j = i+1 ; j < len ; j += 2 ) {
+              v[ j ] = ( v[ j ] ^ n ) & m ;
+            }
+          }
+          var cnt = 0 ;
+          var vv = new Array( (len>>1)-1 ) ;
+          for( i = 1 ; i < len ; i += 2 ) {
+            vv[ cnt++ ] = v[ i ] ;
+          }
+          ret = _binaryToUTF8(vv, 0, vv.length) ;
+        } catch(e) {
+          throw new Error("Analysis failed.");
+        }
+        
+        if(typeof(check) == "string" && check.length > 0) {
+          check = fhash(check);
+          var p = ret.lastIndexOf(_CHECK + check);
+          if(p == -1 || (ret.length - p) != check.length + 1) {
+            throw new Error("Check codes do not match.");
+          }
+          return ret.substring(0,ret.length-(check.length + 1));
+        } else if(useCheck) {
+          throw new Error("Analysis failed.");
+        }
+        return ret;
+      }
+      return o;
+    })();
+    _tally = tally;
 
     // 基本セット.
     var fcipher = {};
@@ -1011,7 +1011,7 @@ if(!window["global"]) {
   var DEF_HEAD_URL = location.protocol + "//" + location.host;
 
   // 割符コード.
-  var _TALLY_CODE = _tally.dec("@^$^-$*~@~=~,$@=*-^$$");
+  var _TALLY_CODE = _tally.dec("@&;,__::#.$;;%#,:%=;&%$&*^-%~^%^.^=*;;$/~%-&=");
 
   // URLを取得.
   var _getUrl = function(url, head) {
@@ -1153,10 +1153,10 @@ if(!window["global"]) {
   }
 
   // 管理者アクセスコードキーコード.
-  var _UACCESS_ADMIN_ACCESS_CODE_KEYCODE = _tally.dec("@/%$$:=.&.=&$^,*%*,_$#@~&_/:-/=^=@,-*&;_;%,$$.#%/..@*.=@@-^/^/;~;/~:;#,%:;/,*^.-;$~::&@%;##@.%*$$:$@^-.*.:&;-#/-$_$^~&#:-@~&~%#=,#-@,@%,/;*;.&:_@-%;;/_$=|", _TALLY_CODE);
+  var _UACCESS_ADMIN_ACCESS_CODE_KEYCODE = _tally.dec("@/.;:/^:$;-/&$%&#&~_^%_/.=~:;$.*@_~$-^&;.:;%~.:$&#^:;*;###~_#*^%^_.@&,;@~.%&%:.,^$#$@#&^&=*;&,/:~_&~.&_.-@,$=__/&^^@.~,~_//:*/%^/#$-@.$:;;^~:#:==:,%,~*#,_*#,-:=%*$#^@$=%-=;;$_~=^:*:;*-$/#/.;$:~.%$_.,@:;=;:%$^*%:*:&/^@-&__.^..@^*_@./-@$.%@_%##~/~^%/;:~@_;$/-@,;*-@;*|", _TALLY_CODE);
 
   // ユーザ管理者コード基本コード.
-  var _UACCESS_ADMIN_CODE_KEYCODE = _tally.dec("@*&;$=%$=@;.&;*,_,,#//&%,;,&,&,%*^^~^,#&=_$~;,_-*;@-@^$^_@~~;/.*-%;@%~-.%@;^#./~%-/%~$,-~^-*#~^==,===.&,;:*-/;_,=:.@.$..^..=.-*%&^_~^:=*@,@/*/,&,,$,_/%%~=^,-.-;=|", _TALLY_CODE);
+  var _UACCESS_ADMIN_CODE_KEYCODE = _tally.dec("@%_%^,.*;%%,#$-=@/;#&.~-%-_@=&*;@&~##~^~@**:-&%/;^,&%.=..%=:/$:~#$~_*@;./~~;.,%$=-~.^#&,/@_%*@_-%/_*,_&;/&**.$..-_^#,;^,#=~.=*_;:/_^*=&@__..=;,***,^=^;=&^$=,@%:__@$_*;%,*@;-#_&%:_.@$-,-.$..*=#_#@,;@~$:=,#&.;_=:~~,#@,-:,-^=-:,:@/-~_*%,%:^$%:_:#~./@%&*/;=.#=-@-@-;/%;*_&@__%%|", _TALLY_CODE);
 
   // オブジェクト.
   var o = {};
