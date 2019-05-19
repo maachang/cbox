@@ -509,7 +509,7 @@ if(!window["global"]) {
     
       // UUIDで返却.
       if(uuidFlg != false) {
-        return nums.byte16ToUUID(n);
+        return _byte16ToUUID(n);
       }
       // バイナリで返却.
       return [
