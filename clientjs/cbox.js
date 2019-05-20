@@ -562,7 +562,8 @@ if(!window["global"]) {
 
     // エンコード.
     fcipher.enc = function(value, pKey, head) {
-        return fcipher.benc(strToArray( ""+value ), pKey, head) ;
+      value = "" + value;
+      return fcipher.benc(_utf8ToBinary(value, 0, value.length), pKey, head) ;
     }
 
     // バイナリエンコード.
@@ -586,7 +587,8 @@ if(!window["global"]) {
 
     // デコード.
     fcipher.dec = function(value, pKey, head) {
-      return aryToString(fcipher.bdec(value, pKey, head)) ;
+      var value = fcipher.bdec(value, pKey, head);
+      return _binaryToUTF8(value, 0, value) ;
     }
 
     // バイナリデコード.
@@ -781,25 +783,7 @@ if(!window["global"]) {
         }
       }
     }
-
-    var strToArray = function(s) {
-      var len = s.length ;
-      var ret = new Uint8Array( len ) ;
-      for( var i = 0 ; i < len ; i ++ ) {
-        ret[ i ] = s.charCodeAt( i )|0 ;
-      }
-      return ret ;
-    }
-
-    var aryToString = function(s) {
-      var len = s.length ;
-      var ret = "";
-      for( var i = 0 ; i < len ; i ++ ) {
-        ret += String.fromCharCode( s[ i ] ) ;
-      }
-      return ret;
-    }
-
+    
     var arraycopy = function(s, sp, d, dp, len) {
       len = len|0;
       sp = sp|0;
