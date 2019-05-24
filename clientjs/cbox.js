@@ -796,8 +796,6 @@ if(!window["global"]) {
     return fcipher;
   })();
 
-  //_g.fcipher = fcipher;
-
   ////////////////////////////////////////////////////////////////////////////////
   // 通常Ajax処理.
   // method : POST or GET.
@@ -1032,7 +1030,7 @@ if(!window["global"]) {
   var _UACCESS_PARAMS = "x-uaccess-params";
 
   // デフォルト非キャッシュ： キャッシュなし.
-  var _DEF_NO_CACHE = true;
+  var _DEF_NO_CACHE = false;
 
   // デフォルトexpire値(１分).
   var _DEF_EXPIRE_TIME = 1000 * 60 * 1;
@@ -1202,6 +1200,16 @@ if(!window["global"]) {
     _setUAccessAccount(name, accountCode, securityCode);
   }
 
+  // expire値のヘッダ生成.
+  var _setExpireHeaders = function(headers, expire) {
+    expire = expire|0;
+    if(expire <= 0) {
+      expire = -1;
+    }
+    headers[_CBOX_FILE_EXPIRE] = "" + expire;
+    return headers;
+  }
+
   // CBOX: 処理区分: フォルダ作成.
   var _CBOX_EXECUTE_TYPE_CREATE_FOLDER = "create-folder";
 
@@ -1226,11 +1234,20 @@ if(!window["global"]) {
   // CBOX: 処理区分: フォルダ存在.
   var _CBOX_EXECUTE_TYPE_IS_FOLDER= "is-folder";
 
+  // CBOX: 処理区分: expire時間設定.
+  var _CBOX_EXECUTE_TYPE_SET_EXPIRE= "set-expire";
+
+  // CBOX: 処理区分: expire時間取得.
+  var _CBOX_EXECUTE_TYPE_GET_EXPIRE= "get-expire";
+
   // CBOX: ロック状態を取得.
   var _CBOX_EXECUTE_TYPE_IS_LOCK = "is-lock";
 
   // CBOX: 強制ロック会場.
   var _CBOX_EXECUTE_TYPE_FORCED_LOCK = "forced-lock";
+
+  // cbox: ファイル寿命(ミリ秒)
+  var _CBOX_FILE_EXPIRE = "x-cbox-file-expire";
 
   // フォルダ作成.
   o.createFolder = function(url, result, errorResult, noCache, timeout) {
@@ -1245,14 +1262,16 @@ if(!window["global"]) {
   
   // [HTML5のFileオブジェクト]を使ってファイルアップロードでファイル登録・更新.
   // urlはフォルダまで.
-  o.updateFile = function(url, value, result, errorResult, noCache, timeout) {
-    _sendUploadPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, _getAuthHeader(), value, noCache, timeout, result, errorResult);
+  o.updateFile = function(url, value, expire, result, errorResult, noCache, timeout) {
+    _sendUploadPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE,
+      _setExpireHeaders(_getAuthHeader(), expire), value, noCache, timeout, result, errorResult);
   }
 
   // データアップロードでファイル登録・更新.
   // url の拡張子でmimeTypeの設定が可能.
-  o.updateData = function(url, value, result, errorResult, noCache, timeout) {
-    _sendPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE, _getAuthHeader(), value, noCache, timeout, result, errorResult);
+  o.updateData = function(url, value, expire, result, errorResult, noCache, timeout) {
+    _sendPost(url, _CBOX_EXECUTE_TYPE_CREATE_FILE,
+      _setExpireHeaders(_getAuthHeader(), expire), value, noCache, timeout, result, errorResult);
   }
 
   // ファイル取得.
@@ -1279,6 +1298,17 @@ if(!window["global"]) {
   // 指定ファイルが存在するかチェック.
   o.isFile = function(url, result, errorResult, noCache, timeout) {
     _sendGet(url, _CBOX_EXECUTE_TYPE_IS_FILE, _getAuthHeader(), null, noCache, timeout, result, errorResult);
+  }
+
+  // ファイル寿命を設定.
+  o.setExpire = function(url, expire, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_SET_EXPIRE,
+      _setExpireHeaders(_getAuthHeader(), expire), null, noCache, timeout, result, errorResult);
+  }
+
+  // 指定フォルダが存在するかチェック.
+  o.getExpire = function(url, result, errorResult, noCache, timeout) {
+    _sendGet(url, _CBOX_EXECUTE_TYPE_GET_EXPIRE, _getAuthHeader(), null, noCache, timeout, result, errorResult);
   }
 
   // 指定フォルダが存在するかチェック.

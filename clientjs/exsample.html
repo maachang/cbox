@@ -28,8 +28,11 @@
 <!--
 <script src="/client/cbox.js"></script>
 -->
-<script src="/client/cbox-min.js.fcipher.js"></script>
 
+<script>
+  var _$tallyCode="test";
+</script>
+<script src="/client/cbox-min.js.cipher.js"></script>  
 
 <link rel="stylesheet" href="/client/exsample.css" type="text/css">
 
@@ -175,6 +178,18 @@ var getUrl = function(id) {
     alert("[" + id + "]のURLが設定されていません");
     throw new Errro("no url error");
   }
+}
+
+// expire値を取得.
+var getExpire = function(id) {
+  var em = $get(id);
+  if(em) {
+    var v = em.value|0;
+    if(v > 0) {
+      return "" + v
+    }
+  }
+  return "-1";
 }
 
 // 処理結果のコールバック.
@@ -534,11 +549,13 @@ var saveAndSettingAuthExpire = function() {
 <!-- updateFile -->
 <p>
   ファイルアップデート : <br>
-  ＵＲＬ:<input type="text" value="" id="updateFolder" class="base_input_text" max="512" size="50">
+  ＵＲＬ: <input type="text" value="" id="updateFolder" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateFolder');">
+  <br>寿命　: <input type="text" value="" id="updateFolderExpire" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateFolderExpire');">
   <br>送信ファイル設定 : <input type="file" value="" id="updateFile" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateFile');">
-  <br><input type="button" value="updateFile" class="base_button" onclick="sendFileUpdate('updateFile', getUrl('updateFolder'), resultCallback)">
+  <br><input type="button" value="updateFile" class="base_button" onclick="sendFileUpdate('updateFile', getUrl('updateFolder'), getExpire('updateFolderExpire'),  resultCallback)">
 </p>
 
 <br>
@@ -546,11 +563,13 @@ var saveAndSettingAuthExpire = function() {
 <!-- updateFile -->
 <p>
   データアップデート : <br>
-  ＵＲＬ　　　　　: <input type="text" value="" id="updateURL" class="base_input_text" max="512" size="50">
+  ＵＲＬ: <input type="text" value="" id="updateURL" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateURL');">
+  <br>寿命　: <input type="text" value="" id="updateURLExpire" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateURLExpire');">
   <br>送信ファイル設定 : <input type="text" value="" id="updateData" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('updateData');">
-  <br><input type="button" value="updateData" value="送信" class="base_button" onclick="cbox.updateData(getUrl('updateURL'), getData('updateData'), resultCallback)">
+  <br><input type="button" value="updateData" value="送信" class="base_button" onclick="cbox.updateData(getUrl('updateURL'), getData('updateData'), getExpire('updateURLExpire'), resultCallback)">
 </p>
 
 <br>
@@ -600,6 +619,8 @@ var saveAndSettingAuthExpire = function() {
       space + (list[i].isFile ? "[FILE]" : "[DIR ]") +
       space + "time: " + toDateString(list[i].fileTime) +
       space + "size: " + numYen(headZero(12, list[i].fileSize)) + " byte" + 
+      space + "expire:" + (list[i].expire <= 0 ? "****/**/** **:**:**(*)" :
+        (toDateString(list[i].expire) + "(" + (list[i].isExpire ? "D" : "U") + ")")) +
       space + "name: " + list[i].name ;
   }
   $get("resultStorageListView").innerHTML = view;
@@ -635,6 +656,28 @@ var saveAndSettingAuthExpire = function() {
   ＵＲＬ:<input type="text" value="" id="isFolder" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('isFolder')">
   &nbsp;<input type="button" value="フォルダ存在" class="base_button" onclick="cbox.isFolder(getUrl('isFolder'), resultCallback)">
+</p>
+
+<br>
+
+<!-- setExpire -->
+<p>
+  ファイル寿命設定 : <br>
+  ＵＲＬ:<input type="text" value="" id="setExpire" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('setExpire')">
+  <br>寿命　: <input type="text" value="" id="setExpireExpire" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('setExpireExpire');">
+  <br><input type="button" value="ファイル寿命" class="base_button" onclick="cbox.setExpire(getUrl('isFile'), getExpire('setExpireExpire'), resultCallback)">
+</p>
+
+<br>
+
+<!-- getExpire -->
+<p>
+  ファイル寿命取得 : <br>
+  ＵＲＬ:<input type="text" value="" id="getExpire" class="base_input_text" max="512" size="50">
+  &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('getExpire')">
+  &nbsp;<input type="button" value="ファイル寿命" class="base_button" onclick="cbox.getExpire(getUrl('getExpire'), resultCallback)">
 </p>
 
 <br>

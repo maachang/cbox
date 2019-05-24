@@ -837,7 +837,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           var result = (file.isFile(name) && !_isExpireFile(name));
           if(!result) {
             // 寿命に達したファイルは物理削除.
-            _removeExpireFile(null, null, pathName);
+            _removeExpireFile(null, null, name);
           }
           _successJSON(res, "ファイルチェック結果:" + url, "" + result);
         }
@@ -911,20 +911,15 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         // 処理成功.
         } else {
           // expireが存在する場合、アクセス不能にするunixTimeをファイル出力.
-          var result = true;
           if(expire > 0) {
-            result = file.writeByString(_expireFileName(name), Date.now() + expire);
+            file.writeByString(_expireFileName(name), Date.now() + expire);
           } else {
             try {
               file.removeFile(_expireFileName(name));
             } catch(e){
             }
           }
-          if(result) {
-            _successJSON(res, "指定ファイルの寿命設定に成功しました:" + url);
-          } else {
-            _errorJSON(res, "指定ファイルの寿命設定に失敗しました:" + url);
-          }
+          _successJSON(res, "指定ファイルの寿命設定に成功しました:" + url);
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);

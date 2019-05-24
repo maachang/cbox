@@ -52,6 +52,7 @@ module.exports = (function () {
     if(closeFlag) {
       headers['Connection'] = 'close';
     }
+    headers['Expire'] = "-1";
     headers['Date'] = _toRfc822(new Date());
     headers['Content-Length'] = bodyLength;
   }
