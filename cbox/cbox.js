@@ -61,11 +61,20 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // CBOX: 処理区分: フォルダ存在.
   var _CBOX_EXECUTE_TYPE_IS_FOLDER= "is-folder";
 
+  // CBOX: 処理区分: expire時間設定.
+  var _CBOX_EXECUTE_TYPE_SET_EXPIRE= "set-expire";
+
+  // CBOX: 処理区分: expire時間取得.
+  var _CBOX_EXECUTE_TYPE_GET_EXPIRE= "get-expire";
+
   // CBOX: ロック状態を取得.
   var _CBOX_EXECUTE_TYPE_IS_LOCK = "is-lock";
 
   // CBOX: 強制ロック会場.
   var _CBOX_EXECUTE_TYPE_FORCED_LOCK = "forced-lock";
+
+  // cbox: ファイル寿命(ミリ秒)
+  var _CBOX_FILE_EXPIRE = "x-cbox-file-expire";
 
   // cboxフォルダが存在しない場合は作成する.
   if(!file.isDir(_CBOX_FOLDER)) {
@@ -147,15 +156,82 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // トップフォルダ名を取得.
-  var _topFolderName = function(name) {
-    var p = name.indexOf("/");
-    if(p == 0) {
-      name = name.substring(1);
-      if((p = name.indexOf("/", 1)) == -1) {
+  var _topFolderName = function(name, off) {
+    off = off|0;
+    var p = name.indexOf("/", off);
+    if(p == off) {
+      name = name.substring(off + 1);
+      if((p = name.indexOf("/", off + 1)) == -1) {
         return name;
       }
     }
-    return name.substring(0, p);
+    return name.substring(off, p);
+  }
+
+  // expireファイル名を取得.
+  var _expireFileName = function(name) {
+    var p = name.lastIndexOf("/");
+    return name.substring(0,p+1) + "." + name.substring(p+1);
+  }
+
+  // expire時間を取得.
+  var _getExpire = function(name) {
+    var expire = -1;
+    name = _expireFileName(name);
+    if(file.isFile(name)) {
+      try {
+        expire = +file.readByString(name);
+      } catch(e) {}
+      if(expire <= 0) {
+        expire = -1;
+      }
+    }
+    return expire;
+  }
+
+  // expireファイルが存在する場合、そのファイルがexpire値を超えているかチェック.
+  var _isExpireFile = function(name) {
+    var time = _getExpire(name);
+    return (time > 0 && time < Date.now())
+  }
+
+  // ファイル寿命が過ぎたファイルの削除時間.
+  // １日後.
+  var _CBOX_DELETE_FILE_BY_EXPIRE_TIME = 1000 * 60 * 60 * 24;
+
+  // expire時間が一定を過ぎている場合、ファイル削除.
+  var _removeExpireFile = function(topName, lockTimeout, name) {
+    var time = _getExpire(name);
+    if(time > 0 && (time + _CBOX_DELETE_FILE_BY_EXPIRE_TIME) < Date.now()) {
+      // topNameが設定されてる場合は、ロック処理.
+      if(topName) {
+        psync.lock(topName, lockTimeout, function(successFlag) {
+          try {
+            if(successFlag) {
+              // 元のファイルと、expireファイルを削除する.
+              file.removeFile(name);
+              file.removeFile(_expireFileName(name));
+            }
+          } catch(e) {
+            console.debug(e);
+          } finally {
+            // アンロック.
+            psync.unLock(topName);
+          }
+        });
+      // top処理が設定されていない場合は、ロック処理は行わない.
+      } else {
+        try {
+          // 元のファイルと、expireファイルを削除する.
+          file.removeFile(name);
+          file.removeFile(_expireFileName(name));
+        } catch(e) {
+          console.debug(e);
+        }
+      }
+      return true;
+    }
+    return false;
   }
 
   // 正常JSONを返却.
@@ -258,6 +334,8 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
               return o.removeFolder(req, res, lockTimeout);
             case _CBOX_EXECUTE_TYPE_REMOVE_FILE:
               return o.removeFile(req, res, lockTimeout);
+            case _CBOX_EXECUTE_TYPE_SET_EXPIRE:
+              return o.setExpire(req, res, lockTimeout);
             case _CBOX_EXECUTE_TYPE_FORCED_LOCK:
               return o.forcedLock(req, res);
           }
@@ -270,6 +348,8 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
               return o.isFile(req, res, lockTimeout);
             case _CBOX_EXECUTE_TYPE_IS_FOLDER:
               return o.isFolder(req, res, lockTimeout);
+            case _CBOX_EXECUTE_TYPE_GET_EXPIRE:
+              return o.getExpire(req, res, lockTimeout);
             case _CBOX_EXECUTE_TYPE_IS_LOCK:
               return o.isLock(req, res, lockTimeout);
           }
@@ -368,6 +448,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     var url = _getUrl(req);
     var name = _CBOX_FOLDER + url;
     var topName = _topFolderName(url);
+
+    // ファイル寿命を設定.
+    var expire = req.headers[_CBOX_FILE_EXPIRE]|0;
+    if(expire <= 0) {
+      expire = -1;
+    }
     psync.lock(topName, lockTimeout, function(successFlag) {
       var ret = true;
       var eventFlag = false;
@@ -423,6 +509,15 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
               // 元のファイルを削除.
               file.removeFile(oldFile);
+            }
+
+            // expireが存在する場合、アクセス不能にするunixTimeをファイル出力.
+            if(expire > 0) {
+              file.writeByString(_expireFileName(name), Date.now() + expire);
+            } else {
+              try {
+                file.removeFile(_expireFileName(name));
+              } catch(e){}
             }
 
             // アンロック.
@@ -503,10 +598,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           res.writeHead(200, headers);
           res.end("");
         // ファイルが存在しない場合は404エラー.
-        } else if(!file.isFile(name)) {
+        // 対象ファイルがexpireしている場合.
+        } else if(!file.isFile(name) || _isExpireFile(name)) {
+          // 寿命に達したファイルは物理削除.
+          _removeExpireFile(null, null, name);
           _errorJSON(res, "指定ファイルは存在しません:" + url, 404);
           ret = false;
-        
         // ファイル読み込み.
         } else {
           // 非同期statで処理するので、ここでは後処理は行わない.
@@ -618,6 +715,8 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // 処理成功.
         } else {
+          // expireファイルを削除.
+          file.removeFile(_expireFileName(name));
           _successJSON(res, "ファイルの削除に成功しました:" + url);
         }
       } catch(e) {
@@ -656,23 +755,44 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           // 指定フォルダ以下のリストを取得.
           var ret = [];
           var n = null;
+          var expire = -1;
           var stat = null;
           var list = file.list(name);
           var len = list.length;
+          var nowDate = Date.now();
+          var pathName = null;
           for(var i = 0; i < len; i ++) {
             n = list[i];
             // 隠しファイルは非表示.
             if(n.indexOf(".") == 0) {
               continue;
             }
-            stat = file.stat(name + "/" + n);
-            if(stat == null) {
+            // パス名変換.
+            pathName = name + "/" + n;
+            // statの取得に失敗の場合は処理しない.
+            if((stat = file.stat(pathName)) == null) {
               continue;
+            }
+            // ファイルの場合.
+            if(stat.isFile()) {
+              // expire値を取得.
+              expire = _getExpire(pathName);
+              // 寿命に達したファイルは物理削除.
+              if(expire > 0 && expire < nowDate) {
+                // ファイルが削除された場合は、非表示.
+                if(_removeExpireFile(null, null, pathName)) {
+                  continue;
+                }
+              }
+            } else {
+              expire = -1;
             }
             ret.push({
               name: n,                        // ファイル/フォルダ名
               fileSize: stat.size,            // ファイルサイズ(byte)
               fileTime: stat.mtime.getTime(), // ファイルタイム(unixTime)
+              expire: expire,                 // expire時間.
+              isExpire: (expire > 0 && expire < nowDate), // expire中ファイルの場合[true]
               isFile: stat.isFile(),          // ファイルの場合[true]
               isDir: stat.isDirectory(),      // フォルダの場合[true]
               isLock: psync.isLock(name)      // ロック状態.
@@ -714,7 +834,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = false;
         // 正常処理.
         } else {
-          _successJSON(res, "ファイルチェック結果:" + url, "" + file.isFile(name));
+          var result = (file.isFile(name) && !_isExpireFile(name));
+          if(!result) {
+            // 寿命に達したファイルは物理削除.
+            _removeExpireFile(null, null, pathName);
+          }
+          _successJSON(res, "ファイルチェック結果:" + url, "" + result);
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -746,6 +871,91 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         // 正常処理.
         } else {
           _successJSON(res, "フォルダチェック結果:" + url, "" + file.isDir(name));
+        }
+      } catch(e) {
+        http.errorFileResult(500, e, res, closeFlag);
+        ret = false;
+      } finally {
+        // アンロック.
+        psync.readUnLock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
+      }
+      return ret;
+    });
+  }
+
+  // 指定ファイルのexpire値設定.
+  o.setExpire = function(req, res, lockTimeout) {
+    var url = _getUrl(req);
+    var name = _CBOX_FOLDER + url;
+    var topName = _topFolderName(url);
+
+    // ファイル寿命を設定.
+    var expire = req.headers[_CBOX_FILE_EXPIRE]|0;
+    if(expire <= 0) {
+      expire = -1;
+    }
+    psync.lock(topName, lockTimeout, function(successFlag) {
+      var ret = true;
+      try {
+        // ロックタイムアウト.
+        if(!successFlag) {
+          _errorLockTimeout(url, res, notCache, closeFlag);
+          ret = false;
+        // URLが不正な場合.
+        } else if(!_topUrlCheck(url, res, closeFlag)) {
+          ret = false;
+        // 処理成功.
+        } else {
+          // expireが存在する場合、アクセス不能にするunixTimeをファイル出力.
+          var result = true;
+          if(expire > 0) {
+            result = file.writeByString(_expireFileName(name), Date.now() + expire);
+          } else {
+            try {
+              file.removeFile(_expireFileName(name));
+            } catch(e){
+            }
+          }
+          if(result) {
+            _successJSON(res, "指定ファイルの寿命設定に成功しました:" + url);
+          } else {
+            _errorJSON(res, "指定ファイルの寿命設定に失敗しました:" + url);
+          }
+        }
+      } catch(e) {
+        http.errorFileResult(500, e, res, closeFlag);
+        ret = false;
+      } finally {
+        // アンロック.
+        psync.unLock(topName);
+        if(!ret) {
+          // リクエストを閉じる.
+          _closeReq(req);
+        }
+      }
+      return ret;
+    });
+  }
+
+  // 指定ファイルの寿命を取得.
+  o.getExpire = function(req, res, lockTimeout) {
+    var url = _getUrl(req);
+    var name = _CBOX_FOLDER + url;
+    var topName = _topFolderName(url);
+    psync.readLock(topName, lockTimeout, function(successFlag) {
+      var ret = true;
+      try {
+        // ロックタイムアウト.
+        if(!successFlag) {
+          _errorLockTimeout(url, res, notCache, closeFlag);
+          ret = false;
+        // 正常処理.
+        } else {
+          _successJSON(res, "ファイル寿命:" + url, "" + _getExpire(name));
         }
       } catch(e) {
         http.errorFileResult(500, e, res, closeFlag);
@@ -816,6 +1026,79 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   // uaccessオブジェクトを取得.
   o.uaccess = function() {
     return uaccess
+  }
+
+  // expire監視: 監視フォルダ.
+  var _EXPIRE_CHECK_FOLDER = _CBOX_FOLDER;
+  var _EXPIRE_CHECK_FOLDER_LENGTH = _EXPIRE_CHECK_FOLDER.length;
+
+  // expire監視: ロックタイムアウト(１秒).
+  var _EXPIRE_CHECK_LOCK_TIMEOUT = 1000;
+
+  // expire監視: 処理キュー.
+  var _EXPIRE_CHECK_QUEUE = [];
+
+  // expire監視: フォルダ監視タイミング.
+  var _EXPIRE_CHECK_TIMEOUT = 5000;
+
+  // expire監視: １つのフォルダ配下のexpire監視.
+  var _expireCheckOne = function(path) {
+    var n = null;
+    var list = file.list(path);
+    var len = list.length;
+    var name = null;
+    var topName = _topFolderName(path, _EXPIRE_CHECK_FOLDER_LENGTH);
+    // topNameが ./cbox の場合は、top名は無効.
+    if(topName == _EXPIRE_CHECK_FOLDER) {
+      topName = null;
+    }
+    for(var i = 0; i < len; i ++) {
+      n = list[i];
+      // 隠しファイルは非表示.
+      if(n.indexOf(".") == 0) {
+        continue;
+      }
+      // パス名変換.
+      name = path + "/" + n;
+      // 対象がフォルダの場合は、億の処理を実行.
+      if(file.isDir(name)) {
+        // 処理キューに追加.
+        _EXPIRE_CHECK_QUEUE.push(name);
+      } else {
+        // expire削除チェック.
+        _removeExpireFile(topName, _EXPIRE_CHECK_LOCK_TIMEOUT, name);
+      }
+    }
+  }
+
+  // expire監視: キュー管理.
+  var _managerQueueByExpireCheck = function() {
+    setTimeout(_executeQueueByExpireCheck, _EXPIRE_CHECK_TIMEOUT);
+  }
+
+  // expire監視: キュー実行.
+  var _executeQueueByExpireCheck = function() {
+    try {
+      // 次の処理キューに溜まっている処理を実行.
+      var path = _EXPIRE_CHECK_QUEUE.shift();
+      if(!path) {
+        // キューに情報が無い場合は、最初のパスを監視.
+        path = _EXPIRE_CHECK_FOLDER;
+      }
+      // 対象パスのExpire監視実行.
+      _expireCheckOne(path);
+    } catch(e) {
+      console.debug("error", e);
+    }
+
+    // 次のキュー管理を行う.
+    _managerQueueByExpireCheck();
+  }
+
+  // expire処理監視.
+  o.expireService = function() {
+    // キュー管理を呼び出す.
+    _managerQueueByExpireCheck();
   }
 
   return o;

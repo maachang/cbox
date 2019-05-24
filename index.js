@@ -9,7 +9,7 @@
 (function() {
   'use strict';
 
-  // 基本定義情報を取得..
+  // 基本定義情報を取得.
   var constants = require('./cbox/constants');
 
   // プロセスタイトルをセット.
@@ -41,8 +41,9 @@
   var closeFlag = argsCmd.registrationParams("boolean", "keepAliveを行わない場合[true]", ["-c", "--close"]);
   var csize = argsCmd.registrationParams("number", "クラスタ数を設定します", ["-l", "--cluster"]);
   if(csize == null) {
-    csize = require('os').cpus().length;;
+    csize = require('os').cpus().length;
   }
+  csize += 1;
 
   // コマンドが存在するかチェック.
   var cmd = null;
@@ -152,7 +153,7 @@
     
     // マスター起動.
     for (var i = 0; i < csize; ++i) {
-      cluster.fork();
+      cluster.fork({clusterNo: i});
     }
 
     // プロセスが落ちた時の処理.
@@ -181,7 +182,13 @@
     cboxProc.startCbox();
   } else {
     
-    // ワーカー起動.
-    require("./cbox/index").create(port, timeout, env, serverId, notCache, closeFlag, _getSystemNanoTime())
+    // 最後のクラスタでは、cbox-expireを起動する.
+    if((process.env.clusterNo|0) + 1 == csize) {
+      // cbox-expire起動.
+      require("./cbox/cbox_expire").create(port, timeout, env, serverId, notCache, closeFlag, _getSystemNanoTime())
+    } else {
+      // ワーカー起動.
+      require("./cbox/index").create(port, timeout, env, serverId, notCache, closeFlag, _getSystemNanoTime())
+    }
   }
 })();
