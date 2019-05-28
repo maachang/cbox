@@ -113,7 +113,7 @@ module.exports.create = function(port, timeout, env, serverId, notCache, closeFl
 
   // コンフィグ情報を取得.
   o.getConfig = function() {
-    return conf;
+    return conf.getConfig();
   }
 
   // 現状の動作環境のコンフィグを取得.

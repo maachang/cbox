@@ -51,23 +51,6 @@ module.exports = (function () {
     var https = require('https');
     var querystring = require('querystring');
 
-    // UTF8文字列のバイナリ長を取得.
-    var _utf8Length = function (n) {
-      var c;
-      var ret = 0;
-      var len = n.length;
-      for (var i = 0; i < len; i++) {
-        if ((c = n.charCodeAt(i)) < 128) {
-          ret++;
-        } else if ((c > 127) && (c < 2048)) {
-          ret += 2;
-        } else {
-          ret += 3;
-        }
-      }
-      return ret;
-    }
-
     // content-typeからcharsetの情報を抽出.
     var _getCharset = function(type) {
       var p = type.indexOf("charset");
@@ -123,18 +106,19 @@ module.exports = (function () {
         opt.path += "?" + urlPms;
       }
       // 条件をセット.
-      opt.method = method;
       opt.headers = headers;
       if(!opt.headers) {
         opt.headers = {};
       }
+
       // パラメータが存在する場合.
       if(params) {
         if(method == "JSON") {
           // jsonの場合はContent-Typeが設定されていない場合はセット.
           if(!opt.headers["content-type"]) {
-            opt.headers["content-type"] = "application/json";
+            opt.headers["content-type"] = "application/json; charset=utf-8;";
           }
+          method = "POST";
         // POST以外の場合.
         } else if(method != "POST") {
           if(typeof(params) == "object") {
@@ -155,6 +139,10 @@ module.exports = (function () {
           }
         }
       }
+
+      // メソッドをセット.
+      opt.method = method;
+
       // ノーキャッシュの場合.
       if(noCache != false) {
         if(opt.path.indexOf("?") != -1) {
@@ -232,6 +220,12 @@ module.exports = (function () {
           postParamsFlag = true;
         } else {
           opt.headers["content-length"] = "0";
+          params = "";
+          postParamsFlag = true;
+        }
+        // content-typeが設定されていない場合.
+        if(!opt.headers["content-type"]) {
+          opt.headers["content-type"] = "application/octet-stream";
         }
       }
 
@@ -255,7 +249,7 @@ module.exports = (function () {
             off += bin.length;
           });
           res.on('end', function() {
-            var status = res.status;
+            var status = res.statusCode;
             if(!status) {
               status = 200;
             }
@@ -277,7 +271,7 @@ module.exports = (function () {
             binLen += bin.length;
           });
           res.on('end', function() {
-            var status = res.status;
+            var status = res.statusCode;
             if(!status) {
               status = 200;
             }
