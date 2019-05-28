@@ -796,18 +796,21 @@ if(!window["global"]) {
     return fcipher;
   })();
 
-  ////////////////////////////////////////////////////////////////////////////////
-  // 通常Ajax処理.
-  // method : POST or GET.
-  // URL : 接続先URL.
-  // params : パラメータ設定(Map定義).
-  // func : コールバックファンクション.
-  //        コールバックファンクションを設定しない場合は、同期取得(非推奨).
-  // errorFunc : エラー発生時のコールバックファンクション.
-  // noCache : キャッシュなしの場合は[true].
-  // header : ヘッダ情報.
-  ////////////////////////////////////////////////////////////////////////////////
-  var _ajax = (function(){
+////////////////////////////////////////////////////////////////////////////////
+// http_client.
+// method : POST(JSON) or GET.
+// URL : 接続先URL.
+// option: 以下がオプションで設定できます.
+//         params : パラメータ設定(Map定義).
+//         noCache : キャッシュなしの場合は[true].
+//         headers : ヘッダ情報.
+// func : コールバックファンクション.
+//        コールバックファンクションを設定しない場合は、同期取得(非推奨).
+//        func(status, body, headers);
+// errorFunc : エラー発生時のコールバックファンクション.
+//             errorFunc(status, body, headers);
+////////////////////////////////////////////////////////////////////////////////
+  var http_client = (function(){
     var head = function(m,x,h){
       if(!h["Content-Type"]) {
         if(m=='POST') {
@@ -830,7 +833,13 @@ if(!window["global"]) {
       return m == 'JSON' ? 'POST' : m;
     }
     
-    return function(method ,url, params, func, errFunc, noCache, header) {
+    return function(method ,url, option, func, errFunc) {
+      if(!option) {
+        option = {};
+      }
+      var params = option.params
+      var noCache = option.params
+      var header = option.params
       errFunc = (typeof(errFunc) != "function") ? func : errFunc;
       method = (method+"").toUpperCase() ;
       if(noCache != true) {
@@ -1059,7 +1068,8 @@ if(!window["global"]) {
     // ヘッダ情報をセット.
     header['Content-Type'] = mimeType;
     header['Content-Length'] = _utf8Length(value);
-    _ajax("POST", url, value, result, errorResult, noCache, header);
+    http_client("POST", url,
+      {params: value, noCache: noCache, headers: header}, result, errorResult);
   }
 
   // postファイルアップロード用送信.
@@ -1092,7 +1102,9 @@ if(!window["global"]) {
     // value.file = ファイル情報.
     header['Content-Type'] = value.type;
     header['Content-Length'] = value.size;
-    _ajax("POST", url, value, result, errorResult, noCache, header);
+    
+    http_client("POST", url, 
+      {params: value, noCache: noCache, headers: header}, result, errorResult);
   }
 
   // get送信.
@@ -1111,7 +1123,8 @@ if(!window["global"]) {
 
     header[_CBOX_EXECUTE_TYPE] = execType;
     header[_CBOX_EXECUTE_TIMEOUT] = (!timeout) ? "" : "" + timeout;
-    _ajax("GET", url, params, result, errorResult, noCache, header);
+    http_client("GET", url, 
+      {params: params, noCache: noCache, headers: header}, result, errorResult);
   }
 
   // uaccess送信.
@@ -1131,7 +1144,8 @@ if(!window["global"]) {
     header[_UACCESS_TYPE] = execType;
     header[_UACCESS_TIMEOUT] = (!timeout) ? "" : "" + timeout;
     header[_UACCESS_PARAMS] = (!params) ? "" : params;
-    _ajax("GET", url, null, result, errorResult, noCache, header);
+    http_client("GET", url, 
+      {params: null, noCache: noCache, headers: header}, result, errorResult);
   }
 
   // 管理者アクセスコードキーコード.

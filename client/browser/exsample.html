@@ -25,14 +25,14 @@
 <meta http-equiv="content-script-type" content="text/javascript; charset=utf-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
 
-<!--
 <script src="/client/cbox.js"></script>
--->
 
+<!--
 <script>
   var _$tallyCode="test";
 </script>
 <script src="/client/cbox-min.js.cipher.js"></script>  
+-->
 
 <link rel="stylesheet" href="/client/exsample.css" type="text/css">
 
@@ -199,7 +199,7 @@ var resultCallback = function(status, result) {
 }
 
 // ファイルアップデート.
-var sendFileUpdate = function(id, url, result) {
+var sendFileUpdate = function(id, url, expire, result) {
   var em = $get(id);
   if(em.files.length <= 0) {
     alert("[" + id + "] ファイルが指定されていません");
@@ -208,7 +208,7 @@ var sendFileUpdate = function(id, url, result) {
   var files = em.files;
   var file = files[0];
 
-  cbox.updateFile(url, file, result)
+  cbox.updateFile(url, file, expire, result)
 }
 
 // データ取得.
@@ -667,7 +667,7 @@ var saveAndSettingAuthExpire = function() {
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('setExpire')">
   <br>寿命　: <input type="text" value="" id="setExpireExpire" class="base_input_text" max="512" size="50">
   &nbsp;<input type="button" value="クリア" class="base_button" onclick="clearInputValue('setExpireExpire');">
-  <br><input type="button" value="ファイル寿命" class="base_button" onclick="cbox.setExpire(getUrl('isFile'), getExpire('setExpireExpire'), resultCallback)">
+  <br><input type="button" value="ファイル寿命" class="base_button" onclick="cbox.setExpire(getUrl('setExpire'), getExpire('setExpireExpire'), resultCallback)">
 </p>
 
 <br>
