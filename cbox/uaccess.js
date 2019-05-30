@@ -31,7 +31,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var o = {};
 
   var file = require("../lib/file");
-  var http = require("./http");
+  var httpCore = require("./httpCore_core");
   var psync = require("../lib/psync")(systemNanoTime);
   var uniqueId = require("../lib/uniqueId");
   var fcipher = require("../lib/fcipher");
@@ -112,7 +112,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
   // ロックタイムアウトエラー.
   var _errorLockTimeout = function(url, res, notCache, closeFlag) {
-    http.errorFileResult(500,
+    httpCore.errorFileResult(500,
       {message: "ロックタイムアウト:" + url},
       res,
       closeFlag);
@@ -160,7 +160,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     if(value) {
       json.value = value;
     }
-    http.sendJson(res, null, json, status, notCache, closeFlag);
+    httpCore.sendJson(res, null, json, status, notCache, closeFlag);
   }
 
   // エラーJSONを返却.
@@ -168,7 +168,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     if(!nums.isNumeric(status)) {
       status = 500;
     }
-    http.errorFileResult(status, message, res, closeFlag);
+    httpCore.errorFileResult(status, message, res, closeFlag);
   }
 
   // パスコードファイル名.
@@ -862,7 +862,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = call();
         }
       } catch(e) {
-        http.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -890,7 +890,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           ret = call();
         }
       } catch(e) {
-        http.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -1269,7 +1269,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       }
       _errorJSON(res, "ヘッダ:" + _UACCESS_TYPE + " の値は存在しないか、内容が不正です:" + executeType);
     } catch(e) {
-      http.errorFileResult(500, e, res, closeFlag);
+      httpCore.errorFileResult(500, e, res, closeFlag);
     }
   }
 
