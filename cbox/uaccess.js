@@ -31,7 +31,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var o = {};
 
   var file = require("../lib/file");
-  var httpCore = require("./httpCore_core");
+  var httpCore = require("./http_core");
   var psync = require("../lib/psync")(systemNanoTime);
   var uniqueId = require("../lib/uniqueId");
   var fcipher = require("../lib/fcipher");

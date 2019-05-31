@@ -46,11 +46,11 @@ module.exports = (function () {
   var http_client = (function () {
     'use strict';
     var _u = undefined;
-
+  
     var http = require("http");
     var https = require('https');
     var querystring = require('querystring');
-
+  
     // content-typeからcharsetの情報を抽出.
     var _getCharset = function(type) {
       var p = type.indexOf("charset");
@@ -67,7 +67,7 @@ module.exports = (function () {
       }
       return type.substring(pp + 1, end);
     }
-
+  
     // http/httpsオプションを生成
     var _getOptions = function(method ,url, params, headers, noCache) {
       var urlPms = "";
@@ -110,7 +110,7 @@ module.exports = (function () {
       if(!opt.headers) {
         opt.headers = {};
       }
-
+  
       // パラメータが存在する場合.
       if(params) {
         if(method == "JSON") {
@@ -139,10 +139,10 @@ module.exports = (function () {
           }
         }
       }
-
+  
       // メソッドをセット.
       opt.method = method;
-
+  
       // ノーキャッシュの場合.
       if(noCache != false) {
         if(opt.path.indexOf("?") != -1) {
@@ -153,7 +153,7 @@ module.exports = (function () {
       }
       return opt;
     }
-
+  
     return function(method ,url, option, func, errFunc) {
       if(typeof(func) != "function") {
         throw new Error("Synchronous execution is not supported.");
@@ -168,22 +168,23 @@ module.exports = (function () {
         noCache = option["no_cache"];
       }
       method = method.toUpperCase();
-
+  
       // エラーハンドリングが設定されていない場合.
       if(typeof(errFunc) != "function") {
         errFunc = func;
       }
-
+  
       // オプション生成.
       var opt = _getOptions(method ,url, params, headers, noCache);
-
+      headers = null;
+  
       // methodがJSONの場合はPOSTに変更.
       var jsonFlag = false;
       if(method == "JSON") {
         jsonFlag = true;
         method = "POST";
       }
-
+  
       // プロトコルから、httpかhttpsかのモジュール選択.
       var conn = null;
       if(opt.protocol == "http:") {
@@ -193,7 +194,7 @@ module.exports = (function () {
       } else {
         conn = http;
       }
-
+  
       // POSTの場合.
       var postParamsFlag = false;
       if(method == "POST") {
@@ -228,18 +229,18 @@ module.exports = (function () {
           opt.headers["content-type"] = "application/octet-stream";
         }
       }
-
+  
       // リクエストを生成.
       var req = conn.request(opt, function(res) {
         var body = null;
         var headers = res.headers;
         var charset = null;
-
+  
         // 文字コードが設定されている場合.
         if(headers["content-type"]) {
           charset = _getCharset(headers["content-type"]);
         }
-
+  
         // content-lengthがある場合.
         if(headers["content-length"]) {
           var off = 0;
@@ -294,7 +295,7 @@ module.exports = (function () {
           });
         }
       });
-
+  
       // エラーハンドリング.
       req.on('error', function(e) {
         var status = e.status;
@@ -303,7 +304,7 @@ module.exports = (function () {
         }
         errFunc(status, e.message, {});
       });
-
+  
       // postデータセット.
       if(postParamsFlag) {
         req.write(params);

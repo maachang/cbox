@@ -837,9 +837,10 @@ if(!window["global"]) {
       if(!option) {
         option = {};
       }
-      var params = option.params
-      var noCache = option.params
-      var header = option.params
+      var params = option.params;
+      var noCache = option.noCache;
+      var headers = option.headers;
+      headers = (!headers) ? {} : headers;
       errFunc = (typeof(errFunc) != "function") ? func : errFunc;
       method = (method+"").toUpperCase() ;
       if(noCache != true) {
@@ -871,7 +872,7 @@ if(!window["global"]) {
       if( func == _u ) {
         var x = new XMLHttpRequest();
         x.open(_m(method),url,false);
-        head(method,x,header);
+        head(method, x, headers);
         x.send(pms);
         var state = x.status;
         if(state == 0) {
@@ -923,7 +924,7 @@ if(!window["global"]) {
           }
         }
       }
-      head(method,x,header);
+      head(method, x, headers);
       x.send(pms);
     };
   })() ;
