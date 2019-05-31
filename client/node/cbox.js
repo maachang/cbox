@@ -5,10 +5,6 @@ module.exports = (function () {
   'use strict';
   var _u = undefined;
 
-  var http = require("http");
-  var https = require('https');
-  var querystring = require('querystring');
-
   // デフォルトURLヘッド(http://domain).
   var DEF_HEAD_URL = "";
 
@@ -44,9 +40,6 @@ module.exports = (function () {
   //             errorFunc(status, body, headers);
   ////////////////////////////////////////////////////////////////////////////////
   var http_client = (function () {
-    'use strict';
-    var _u = undefined;
-  
     var http = require("http");
     var https = require('https');
     var querystring = require('querystring');
