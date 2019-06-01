@@ -118,6 +118,7 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         memory.psync = Object.freeze(require("../lib/psync")(systemNanoTime));
         memory.uniqueId = Object.freeze(require("../lib/uniqueId"));
         memory.http_client = Object.freeze(require("../lib/http_client"));
+        memory.phttpc = Object.freeze(require("../lib/phttpc"));
         memory.argsCmd = require("../lib/subs/args").clear();
 
         // cbox は readLock, writeLock, uaccess を利用可能にする.
