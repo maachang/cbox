@@ -10,11 +10,20 @@ module.exports.create = function(port, timeout, env, serverId, notCache, closeFl
     port, timeout, env, serverId, notCache, closeFlag, systemNanoTime);
   var cboxProc = require("./cbox_proc");
 
+  // httpサーバ実行処理.
+  var _exec = async function(req, res) {
+    setImmediate(function() {
+      var rq = req; req = null;
+      var rs = res; res = null;
+      // cboxを実行.
+      cbox.execute(rq, rs);
+    });
+  }
+
   // httpサーバ生成.
   var createHttp = function () {
     return http.createServer(function (req, res) {
-      // cboxを実行.
-      cbox.execute(req, res);
+      _exec(req, res);
     })
   }
 

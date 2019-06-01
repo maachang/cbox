@@ -108,6 +108,7 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         // メモリにcboxで利用するライブラリをセット.
         memory.sysParams = Object.freeze(sysParams);
         memory.file = Object.freeze(file);
+        memory.pfile = Object.freeze(require("../lib/pfile"));
         memory.cboxProc = Object.freeze(require("./cbox_proc"));
         memory.constants = Object.freeze(require("./constants"));
         memory.fcipher = Object.freeze(require("../lib/fcipher"));
@@ -116,6 +117,7 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         memory.nums = Object.freeze(require("../lib/nums"));
         memory.psync = Object.freeze(require("../lib/psync")(systemNanoTime));
         memory.uniqueId = Object.freeze(require("../lib/uniqueId"));
+        memory.http_client = Object.freeze(require("../lib/http_client"));
         memory.argsCmd = require("../lib/subs/args").clear();
 
         // cbox は readLock, writeLock, uaccess を利用可能にする.
