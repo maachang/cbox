@@ -8,30 +8,33 @@
 //
 //
 
-module.exports.create = function(port, timeout, env, serverId, notCache, closeFlag, systemNanoTime) {
+module.exports.create = function(conf, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime) {
 
   var constants = require("./constants");
-  var conf = require("./conf")(constants.CONF_DIR);
+
+  if(!conf) {
+    conf = require("./conf")(constants.CONF_DIR);
+  }
 
   // バインドポート.
   var _PORT = port;
-  var _ENV_PORT = "CBOX_PORT";
+  var _ENV_PORT = constants.ENV_PORT;
 
   // 通信タイムアウト.
   var _TIMEOUT = timeout;
-  var _ENV_TIMEOUT = "CBOX_TIMEOUT";
+  var _ENV_TIMEOUT = constants.ENV_TIMEOUT;
 
   // 実行環境.
   var _ENV = env;
-  var _ENV_ENV = "CBOX_ENV";
+  var _ENV_ENV = constants.ENV_ENV;
 
   // 通信キャッシュ.
   var _NOT_CACHE = notCache;
-  var _ENV_NOT_CACHE ="CBOX_NOT_CACHE";
+  var _ENV_NOT_CACHE = constants.ENV_NOT_CACHE;
 
   // 通信クローズ.
   var _CLOSE_FLAG = closeFlag;
-  var _ENV_CLOSE_FLAG = "CBOX_CLOSE_FLAG";
+  var _ENV_CLOSE_FLAG = constants.ENV_CLOSE_FLAG;
 
   // サーバ固有ID.
   var _SERVER_ID = serverId;

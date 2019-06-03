@@ -23,6 +23,9 @@ module.exports = (function () {
 
   // コンフィグフォルダ.
   o.CONF_DIR = "./conf";
+
+  // ログフォルダ.
+  o.LOG_DIR = "./log";
   
   // デフォルトバインドポート.
   o.PORT = 3210;
@@ -35,6 +38,27 @@ module.exports = (function () {
 
   // 通信keepAlive.
   o.CLOSE_FLAG = false;
+
+  // 環境変数: バインドポート.
+  o.ENV_PORT = "CBOX_PORT";
+
+  // 環境変数: 通信タイムアウト.
+  o.ENV_TIMEOUT = "CBOX_TIMEOUT";
+
+  // 環境変数: 実行環境.
+  o.ENV_ENV = "CBOX_ENV";
+
+  // 環境変数: 通信キャッシュ.
+  o.ENV_NOT_CACHE ="CBOX_NOT_CACHE";
+
+  // 環境変数: 通信クローズ.
+  o.ENV_CLOSE_FLAG = "CBOX_CLOSE_FLAG";
+
+  // デフォルト実行環境名.
+  o.DEFAULT_ENV = "development";
+
+  // ロガー定義ファイル名.
+  o.LOGGER_CONF = "logConf";
   
   // タイトル表示.
   o.viewTitle = function(out,enter) {

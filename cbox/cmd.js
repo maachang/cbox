@@ -1,7 +1,7 @@
 // cbox-cmd.
 //
 
-module.exports.create = function(cmdName, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime) {
+module.exports.create = function(cmdName, conf, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime) {
   'use strict';
   try {
     var vm = require('vm');
@@ -25,9 +25,12 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
       "setTimeout"
     ];
 
+    // ロガー設定.
+    var log = logger.get();
+
     // システムパラメータを取得.
     var sysParams = require("./sysparams").create(
-      port, timeout, env, serverId, notCache, closeFlag, systemNanoTime);
+      conf, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime);
 
     // ファイルに対するフォルダ情報を取得.
     var getFolder = function(name) {
@@ -107,6 +110,7 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
 
         // メモリにcboxで利用するライブラリをセット.
         memory.sysParams = Object.freeze(sysParams);
+        memory.logger = Object.freeze(logger);
         memory.file = Object.freeze(file);
         memory.pfile = Object.freeze(require("../lib/pfile"));
         memory.cboxProc = Object.freeze(require("./cbox_proc"));
@@ -143,9 +147,9 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
         return true;
       } catch(e) {
         if(e["message"]) {
-          console.log(e.message);
+          log.error(e.message, e);
         } else {
-          console.log(""+e);
+          log.error(e);
         }
         return false;
       }
@@ -153,20 +157,20 @@ module.exports.create = function(cmdName, port, timeout, env, serverId, notCache
 
     // プロセス例外ハンドラ.
     process.on('uncaughtException', function(e) {
-      console.trace(e, e);
+      log.error(e);
       return false;
     });
 
     // promise例外ハンドラ.
     process.on('unhandledRejection', (reason) => {
-      console.trace(reason, e);
+      log.error(reason);
       return false;
     });
     
     return executeFile(cmdName);
 
   }catch(e) {
-    console.log(e, e);
+    log.error(e);
     return false;
   }
 }

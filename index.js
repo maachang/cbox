@@ -6,8 +6,11 @@
  * MIT Licensed
  */
 
-(function() {
+(function(_g) {
   'use strict';
+
+  // クラスタ.
+  var cluster = require('cluster');
 
   // 基本定義情報を取得.
   var constants = require('./cbox/constants');
@@ -26,6 +29,9 @@
 
   // ファイル.
   var file = require("./lib/file");
+
+  // コンフィグ.
+  var conf = null;
 
   // サーバID.
   var serverId = serverId.getId();
@@ -103,37 +109,86 @@
     return parseInt(file.readByString(_SYSTEM_NANO_TIME_FILE));
   }
 
+  // コマンド実行フラグを取得.
+  var cmdFlag = (cmd != null && cmd == "cmd");
+
+  // クラスタがマスターでない、コンソール起動の場合.
+  if(!cluster.isMaster || cmdFlag) {
+    // 実行環境名を取得.
+    var targetEnv = env;
+    if(!targetEnv) {
+      targetEnv = process.env[constants.ENV_ENV];
+      if(!targetEnv) {
+        // 何も設定されていない場合のデフォルト値.
+        targetEnv = constants.DEFAULT_ENV;
+      }
+    }
+
+    // コンフィグ情報.
+    conf = require("./cbox/conf")(constants.CONF_DIR);
+
+    // 実行環境用のコンフィグが存在する場合は、そちらを取得.
+    var envConf = (!conf.getConfig()[targetEnv]) ?
+      conf.getConfig() : conf.getConfig()[targetEnv];
+
+    // 基本ログの初期化.
+    var baseLogger = require("./lib/base_logger");
+
+    // 基本ログ定義.
+    var logs = null;
+    if(envConf[constants.LOGGER_CONF]) {
+      
+      // conf情報が存在する場合.
+      logs = baseLogger.load(envConf[constants.LOGGER_CONF]);
+    } else {
+
+      // デフォルト設定.
+      baseLogger.setting("info", null, constants.LOG_DIR);
+      logs = [baseLogger.create("system")];
+    }
+
+    // 出力先のログフォルダ作成.
+    if(!file.isDir(baseLogger.logDir())) {
+      file.mkdirs(baseLogger.logDir());
+    }
+
+    // ロガー定義.
+    var logger = require("./cbox/logger");
+    var len = logs.length;
+    for(var i = 0; i < len; i ++) {
+      logger.setup(logs[i].name(), logs[i]);
+    }
+    _g.logger = logger;
+  }
+
   // コマンド実行起動ができるかチェック.
-  if (cmd != null) {
-    if(cmd == "cmd") {
-      // cmd終了時に安全に終了結果を送る.
-      var exitCode = 0;
-      process.on('exit', function() {
-        process.exit(exitCode);
-      });
+  if (cmdFlag) {
+    // cmd終了時に安全に終了結果を送る.
+    var exitCode = 0;
+    process.on('exit', function() {
+      process.exit(exitCode);
+    });
 
-      if (argv_params.length > 3) {
+    if (argv_params.length > 3) {
 
-        // サーバの最後に起動した起動時間を取得.
-        var nanoTime = file.isFile(_SYSTEM_NANO_TIME_FILE) ?
-          _getSystemNanoTime() : nums.getNanoTime();
+      // サーバの最後に起動した起動時間を取得.
+      var nanoTime = file.isFile(_SYSTEM_NANO_TIME_FILE) ?
+        _getSystemNanoTime() : nums.getNanoTime();
 
-        // コマンド実行.
-        var cmdName = "" + argv_params[3];
-        var res = require("./cbox/cmd").create(cmdName, port, timeout, env, serverId, notCache, closeFlag, nanoTime)
-        if(!res) {
-          exitCode = 1;
-        }
-      } else {
-        console.log("指定コマンドが設定されていません");
+      // コマンド実行.
+      var cmdName = "" + argv_params[3];
+      var res = require("./cbox/cmd").create(cmdName, conf, port, timeout, env, serverId, notCache, closeFlag, nanoTime)
+      if(!res) {
         exitCode = 1;
       }
-      return;
+    } else {
+      console.log("指定コマンドが設定されていません");
+      exitCode = 1;
     }
+    return;
   }
 
   // クラスタ起動.
-  var cluster = require('cluster');
   if (cluster.isMaster) {
 
     // cbox プロセス管理.
@@ -188,7 +243,7 @@
       require("./cbox/cbox_expire").create(port, timeout, env, serverId, notCache, closeFlag, _getSystemNanoTime())
     } else {
       // ワーカー起動.
-      require("./cbox/index").create(port, timeout, env, serverId, notCache, closeFlag, _getSystemNanoTime())
+      require("./cbox/index").create(conf, port, timeout, env, serverId, notCache, closeFlag, _getSystemNanoTime())
     }
   }
-})();
+})(global);

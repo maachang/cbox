@@ -2,16 +2,16 @@
 //
 //
 
-module.exports.create = function(port, timeout, env, serverId, notCache, closeFlag, systemNanoTime) {
+module.exports.create = function(conf, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime) {
   'use strict';
 
   var http = require('http');
   var sysParams = require("./sysparams").create(
-    port, timeout, env, serverId, notCache, closeFlag, systemNanoTime);
+    conf, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime);
   var cboxProc = require("./cbox_proc");
 
   // httpサーバ実行処理.
-  var _exec = function(req, res) {
+  var _exec = async function(req, res) {
     setImmediate(function() {
       var rq = req;
       var rs = res;
@@ -21,7 +21,7 @@ module.exports.create = function(port, timeout, env, serverId, notCache, closeFl
   }
 
   // httpサーバ生成.
-  var createHttp = async function () {
+  var createHttp = function () {
     var cc = _exec;
     return http.createServer(function (req, res) {
       var c = cc;

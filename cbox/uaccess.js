@@ -111,10 +111,10 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // ロックタイムアウトエラー.
-  var _errorLockTimeout = function(url, res, notCache, closeFlag) {
+  var _errorLockTimeout = function(url, req, res, notCache, closeFlag) {
     httpCore.errorFileResult(500,
       {message: "ロックタイムアウト:" + url},
-      res,
+      req, res,
       closeFlag);
   }
 
@@ -134,8 +134,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         call(res);
       }
     } catch(e) {
-      // エラー情報を返却.
-      _errorJSON(res, "エラーが発生しました: " + e.message, 500);
+      errorCall(e);
     }
   }
 
@@ -164,11 +163,11 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // エラーJSONを返却.
-  var _errorJSON = function(res, message, status) {
+  var _errorJSON = function(req, res, message, status) {
     if(!nums.isNumeric(status)) {
       status = 500;
     }
-    httpCore.errorFileResult(status, message, res, closeFlag);
+    httpCore.errorFileResult(status, message, req, res, closeFlag);
   }
 
   // パスコードファイル名.
@@ -855,14 +854,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // 正常処理.
         } else {
           ret = call();
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -883,14 +882,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // 正常処理.
         } else {
           ret = call();
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -908,7 +907,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var __authAdminAccess = function(req, res) {
     // 管理者ユーザ認証コードがセットされていない場合.
     if(!_authAdminAccess(req)) {
-      _errorJSON(res, "管理者コードにアクセスできません", 401);
+      _errorJSON(req, res, "管理者コードにアクセスできません", 401);
       return false;
     }
     return true;
@@ -950,7 +949,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       if(_removeAdminCode(code)) {
         _successJSON(res, "管理者コードの削除に成功しました");
       } else {
-        _errorJSON(res, "管理者コードの削除に失敗しました");
+        _errorJSON(req, res, "管理者コードの削除に失敗しました");
       }
       return true;
     })
@@ -977,7 +976,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       if(code) {
         _successJSON(res, "最新の管理者コードの取得に成功しました", code);
       } else {
-        _errorJSON(res, "最新の管理者コードの取得に失敗しました");
+        _errorJSON(req, res, "最新の管理者コードの取得に失敗しました");
       }
       return true;
     })
@@ -992,7 +991,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       if(_removeOldAdminCode()) {
         _successJSON(res, "一番古い管理者コードの削除に成功しました");
       } else {
-        _errorJSON(res, "一番古い管理者コードの削除に失敗しました");
+        _errorJSON(req, res, "一番古い管理者コードの削除に失敗しました");
       }
       return true;
     })
@@ -1034,7 +1033,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       if(_removeSecurityCode(code)) {
         _successJSON(res, "セキュリティコードの削除に成功しました");
       } else {
-        _errorJSON(res, "セキュリティコードの削除に失敗しました");
+        _errorJSON(req, res, "セキュリティコードの削除に失敗しました");
       }
       return true;
     })
@@ -1062,7 +1061,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         _successJSON(res, "最新のセキュリティコードの取得に成功しました", code);
         return true;
       }
-      _errorJSON(res, "最新のセキュリティコードの取得に失敗しました");
+      _errorJSON(req, res, "最新のセキュリティコードの取得に失敗しました");
       return false;
     })
   }
@@ -1077,7 +1076,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         _successJSON(res, "一番古いセキュリティコードの削除に成功しました");
         return true;
       }
-      _errorJSON(res, "一番古いセキュリティコードの削除に失敗しました");
+      _errorJSON(req, res, "一番古いセキュリティコードの削除に失敗しました");
       return false;
     })
   }
@@ -1109,7 +1108,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         });
         return true;
       }
-      _errorJSON(res, "新しいユーザアカウントコードの生成に失敗しました", 401);
+      _errorJSON(req, res, "新しいユーザアカウントコードの生成に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1125,12 +1124,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
             _successJSON(res, "ユーザアカウント情報の削除に成功しました");
             return true;
           }
-          _errorJSON(res, "ユーザアカウント情報の削除に失敗しました");
+          _errorJSON(req, res, "ユーザアカウント情報の削除に失敗しました");
           return false;
         });
         return true;
       }
-      _errorJSON(res, "ユーザアカウント情報の削除に失敗しました", 401);
+      _errorJSON(req, res, "ユーザアカウント情報の削除に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1147,12 +1146,12 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
             _successJSON(res, "ユーザアカウント情報の取得に成功しました", code);
             return true;
           }
-          _errorJSON(res, "ユーザアカウント情報の取得に失敗しました");
+          _errorJSON(req, res, "ユーザアカウント情報の取得に失敗しました");
           return false;
         });
         return true;
       }
-      _errorJSON(res, "ユーザアカウント情報の取得に失敗しました", 401);
+      _errorJSON(req, res, "ユーザアカウント情報の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1168,7 +1167,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         });
         return true;
       }
-      _errorJSON(res, "ユーザアカウント一覧情報の取得に失敗しました", 401);
+      _errorJSON(req, res, "ユーザアカウント一覧情報の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1185,7 +1184,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         });
         return true;
       }
-      _errorJSON(res, "ユーザアカウント情報の存在確認の取得に失敗しました", 401);
+      _errorJSON(req, res, "ユーザアカウント情報の存在確認の取得に失敗しました", 401);
       return false;
     }, null, lockTimeout);
   }
@@ -1230,7 +1229,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
       // get以外のメソッドはエラー400にする.
       if(method != "get") {
-        _errorJSON(res, "bad request.", 400);
+        _errorJSON(req, res, "bad request.", 400);
         return;
       }
 
@@ -1267,9 +1266,9 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       case _UACCESS_TYPE_IS_ACCOUNT_CODE:
         return this.isAccountCode(req, res, lockTimeout);
       }
-      _errorJSON(res, "ヘッダ:" + _UACCESS_TYPE + " の値は存在しないか、内容が不正です:" + executeType);
+      _errorJSON(req, res, "ヘッダ:" + _UACCESS_TYPE + " の値は存在しないか、内容が不正です:" + executeType);
     } catch(e) {
-      httpCore.errorFileResult(500, e, res, closeFlag);
+      httpCore.errorFileResult(500, e, req, res, closeFlag);
     }
   }
 

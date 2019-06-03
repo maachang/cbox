@@ -14,6 +14,9 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   var uaccess = require("./uaccess").create(notCache, closeFlag, serverId, systemNanoTime, notCmdFlg);
   var nums = require("../lib/nums");
 
+  // ロガー.
+  var log = logger.get();
+
   // コンフィグ(実行環境用)
   var envConf = null;
 
@@ -98,11 +101,11 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // urlに./ や ..が存在するかチェック.
-  var _checkUrl = function(url, res, closeFlag) {
+  var _checkUrl = function(url, req, res, closeFlag) {
     if(url.indexOf("../") != -1) {
       httpCore.errorFileResult(403,
         {message: "不正なURLを検知:" + url},
-        res,
+        req, res,
         closeFlag);
       return false;
     }
@@ -110,7 +113,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     if(url.indexOf("/.") != -1 || url.indexOf("/@") != -1) {
       httpCore.errorFileResult(403,
         {message: "隠しファイル・フォルダ、[@]先頭名のファイル：フォルダは禁止です:" + url},
-        res,
+        req, res,
         closeFlag);
       return false;
     }
@@ -119,14 +122,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
   // URLにTOPフォルダにファイルを指定している場合はエラー返却.
   // ファイルのI/Oに対して有効.
-  var _topUrlCheck = function(url, res, closeFlag, noError) {
+  var _topUrlCheck = function(url, req, res, closeFlag, noError) {
     noError = noError == true;
     var p = url.indexOf("/", 1);
     if(p == -1 || p + 1 == url.length) {
       if(!noError) {
         httpCore.errorFileResult(403,
           {message: "ルートフォルダにファイルは設定できません:" + url},
-          res,
+          req, res,
           closeFlag);
       }
       return false;
@@ -213,7 +216,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
               file.removeFile(_expireFileName(name));
             }
           } catch(e) {
-            console.debug(e);
+            log.debug(e);
           } finally {
             // アンロック.
             psync.unLock(topName);
@@ -226,7 +229,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           file.removeFile(name);
           file.removeFile(_expireFileName(name));
         } catch(e) {
-          console.debug(e);
+          log.debug(e);
         }
       }
       return true;
@@ -247,16 +250,16 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
   }
 
   // エラーJSONを返却.
-  var _errorJSON = function(res, message, status) {
+  var _errorJSON = function(req, res, message, status) {
     if(!nums.isNumeric(status)) {
       status = 500;
     }
-    httpCore.errorFileResult(status, message, res, closeFlag);
+    httpCore.errorFileResult(status, message, req, res, closeFlag);
   }
 
   // ロックタイムアウトエラー.
-  var _errorLockTimeout = function(url, res, notCache, closeFlag) {
-    _errorJSON(res, "ロックタイムアウト:" + url)
+  var _errorLockTimeout = function(url, req, res, notCache, closeFlag) {
+    _errorJSON(req, res, "ロックタイムアウト:" + url)
   }
 
   // リクエストを閉じる処理.
@@ -286,7 +289,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       var url = _getUrl(req);
 
       // URL不正チェック.
-      if(!_checkUrl(url, res, closeFlag)) {
+      if(!_checkUrl(url, req, res, closeFlag)) {
         ret = false;
       
       // methodで処理を分ける.
@@ -298,7 +301,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         }
 
         // エラー返却.
-        _errorJSON(res, "処理タイプ[" + executeType + "]に対してmethodが POST で処理できません:" + url);
+        _errorJSON(req, res, "処理タイプ[" + executeType + "]に対してmethodが POST で処理できません:" + url);
         ret = false;
       } else if(method == "get") {
 
@@ -320,49 +323,54 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
 
         // uaccessアカウント認証ありで処理する.
         uaccess.authAccount(req, function(result) {
-          if(result == false) {
+          try {
+            if(result == false) {
+              // エラー返却.
+              _errorJSON(req, res, "cboxの処理タイプ " + executeType + " のアクセスには認証が必要です:" + url);
+              return false;
+            }
+
+            // 書き込み系処理.
+            switch(executeType) {
+              case _CBOX_EXECUTE_TYPE_CREATE_FOLDER:
+                return o.createFolder(req, res, lockTimeout);
+              case _CBOX_EXECUTE_TYPE_REMOVE_FOLDER:
+                return o.removeFolder(req, res, lockTimeout);
+              case _CBOX_EXECUTE_TYPE_REMOVE_FILE:
+                return o.removeFile(req, res, lockTimeout);
+              case _CBOX_EXECUTE_TYPE_SET_EXPIRE:
+                return o.setExpire(req, res, lockTimeout);
+              case _CBOX_EXECUTE_TYPE_FORCED_LOCK:
+                return o.forcedLock(req, res);
+            }
+
+            // 読み込み系処理.
+            switch(executeType) {
+              case _CBOX_EXECUTE_TYPE_LIST:
+                return o.list(req, res, lockTimeout);
+              case _CBOX_EXECUTE_TYPE_IS_FILE:
+                return o.isFile(req, res, lockTimeout);
+              case _CBOX_EXECUTE_TYPE_IS_FOLDER:
+                return o.isFolder(req, res, lockTimeout);
+              case _CBOX_EXECUTE_TYPE_GET_EXPIRE:
+                return o.getExpire(req, res, lockTimeout);
+              case _CBOX_EXECUTE_TYPE_IS_LOCK:
+                return o.isLock(req, res, lockTimeout);
+            }
+
             // エラー返却.
-            _errorJSON(res, "cboxの処理タイプ " + executeType + " のアクセスには認証が必要です:" + url);
+            _errorJSON(req, res, "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url);
+            return false;
+          } catch(e) {
+            _errorJSON(req, res,"error", url, e);
             return false;
           }
-
-          // 書き込み系処理.
-          switch(executeType) {
-            case _CBOX_EXECUTE_TYPE_CREATE_FOLDER:
-              return o.createFolder(req, res, lockTimeout);
-            case _CBOX_EXECUTE_TYPE_REMOVE_FOLDER:
-              return o.removeFolder(req, res, lockTimeout);
-            case _CBOX_EXECUTE_TYPE_REMOVE_FILE:
-              return o.removeFile(req, res, lockTimeout);
-            case _CBOX_EXECUTE_TYPE_SET_EXPIRE:
-              return o.setExpire(req, res, lockTimeout);
-            case _CBOX_EXECUTE_TYPE_FORCED_LOCK:
-              return o.forcedLock(req, res);
-          }
-
-          // 読み込み系処理.
-          switch(executeType) {
-            case _CBOX_EXECUTE_TYPE_LIST:
-              return o.list(req, res, lockTimeout);
-            case _CBOX_EXECUTE_TYPE_IS_FILE:
-              return o.isFile(req, res, lockTimeout);
-            case _CBOX_EXECUTE_TYPE_IS_FOLDER:
-              return o.isFolder(req, res, lockTimeout);
-            case _CBOX_EXECUTE_TYPE_GET_EXPIRE:
-              return o.getExpire(req, res, lockTimeout);
-            case _CBOX_EXECUTE_TYPE_IS_LOCK:
-              return o.isLock(req, res, lockTimeout);
-          }
-
-          // エラー返却.
-          _errorJSON(res, "処理タイプ[" + executeType + "]に対してmethodが " + method.toUpperCase() + " で処理できません:" + url);
-          return false;
         }, null, lockTimeout);
       }
 
       return ret;
     } catch(error) {
-      httpCore.errorFileResult(500, error, res, closeFlag);
+      httpCore.errorFileResult(500, error, req, res, closeFlag);
       ret = false;
       return ret;
     } finally {
@@ -383,18 +391,18 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // フォルダ作成失敗.
         } else if(!file.mkdirs(name)) {
-          _errorJSON(res, "フォルダの作成に失敗しました:" + url);
+          _errorJSON(res, req, "フォルダの作成に失敗しました:" + url);
           ret = false;
         // 処理成功.
         } else {
           _successJSON(res, "フォルダの作成に成功しました:" + url);
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -418,18 +426,18 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // 削除フォルダが存在しない.
         } else if(!file.delete(name)) {
-          _errorJSON(res, "フォルダの削除に失敗しました:" + url);
+          _errorJSON(req, res, "フォルダの削除に失敗しました:" + url);
           ret = false;
         // 処理成功.
         } else {
           _successJSON(res, "フォルダの削除に成功しました:" + url);
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -460,18 +468,18 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // URLが不正な場合.
-        } else if(!_topUrlCheck(url, res, closeFlag)) {
+        } else if(!_topUrlCheck(url, req, res, closeFlag)) {
           ret = false;
         // 同じファイル名で既にフォルダが存在している.
         } else if(file.isDir(name)) {
-          _errorJSON(res, "ファイル作成に失敗しました: 同じフォルダ名が存在します:" + url, 403);
+          _errorJSON(req, res, "ファイル作成に失敗しました: 同じフォルダ名が存在します:" + url, 403);
           ret = false;
         // ファイルを設置するフォルダ名が存在しない場合エラー..
         } else if(!file.isDir(_getFolder(name))) {
-          _errorJSON(res, "ファイル作成に失敗しました: フォルダが存在しません:" + url, 403);
+          _errorJSON(req, res, "ファイル作成に失敗しました: フォルダが存在しません:" + url, 403);
           ret = false;
         
         // ファイル書き込み.
@@ -548,14 +556,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
             psync.unLock(topName);
           
             // エラー返却.
-            httpCore.errorFileResult(500, err, res, closeFlag);
+            httpCore.errorFileResult(500, err, req, res, closeFlag);
 
             // リクエストを閉じる.
             _closeReq(req);
           });
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         var ret = false;
       } finally {
 
@@ -583,14 +591,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // favicon.icoの場合は404 返却.
         } else if(url == _FAVICON_ICO) {
           httpCore.sendFaviconIco(res, {}, closeFlag);
           ret = false;
         // URLが不正な場合.
-        } else if(!_topUrlCheck(url, res, closeFlag, true)) {
+        } else if(!_topUrlCheck(url, req, res, closeFlag, true)) {
           // 空のデータ送信.
           var headers = {};
           headers['Content-Type'] = "text/plain; charset=utf-8;";
@@ -602,7 +610,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
         } else if(!file.isFile(name) || _isExpireFile(name)) {
           // 寿命に達したファイルは物理削除.
           _removeExpireFile(null, null, name);
-          _errorJSON(res, "指定ファイルは存在しません:" + url, 404);
+          _errorJSON(req, res, "指定ファイルは存在しません:" + url, 404);
           ret = false;
         // ファイル読み込み.
         } else {
@@ -664,7 +672,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
                 })
               }
             }catch(e) {
-              httpCore.errorFileResult(500, e, res, closeFlag);
+              httpCore.errorFileResult(500, e, req, res, closeFlag);
               ret = false;
             } finally {
               if(!eventFlag) {
@@ -678,7 +686,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           });
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // statで処理していない場合.
@@ -704,14 +712,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // URLが不正な場合.
-        } else if(!_topUrlCheck(url, res, closeFlag)) {
+        } else if(!_topUrlCheck(url, req, res, closeFlag)) {
           ret = false;
         // ファイルが存在しない.
         } else if(!file.removeFile(name)) {
-          _errorJSON(res, "ファイルの削除に失敗しました:" + url);
+          _errorJSON(req, res, "ファイルの削除に失敗しました:" + url);
           ret = false;
         // 処理成功.
         } else {
@@ -720,7 +728,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           _successJSON(res, "ファイルの削除に成功しました:" + url);
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -744,11 +752,11 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // 指定フォルダが存在しない.
         } else if(!file.isDir(name)) {
-          _errorJSON(res, "リスト取得に失敗しました: フォルダではありません:" + url, 403);
+          _errorJSON(req, res, "リスト取得に失敗しました: フォルダではありません:" + url, 403);
           ret = false;
         // リスト一覧取得.
         } else {
@@ -803,7 +811,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           _successJSON(res, "リスト取得に成功しました:" + url, {parent: url, list: ret});
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -827,10 +835,10 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // URLが不正な場合.
-        } else if(!_topUrlCheck(url, res, closeFlag)) {
+        } else if(!_topUrlCheck(url, req, res, closeFlag)) {
           ret = false;
         // 正常処理.
         } else {
@@ -842,7 +850,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           _successJSON(res, "ファイルチェック結果:" + url, "" + result);
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -866,14 +874,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // 正常処理.
         } else {
           _successJSON(res, "フォルダチェック結果:" + url, "" + file.isDir(name));
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -903,10 +911,10 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // URLが不正な場合.
-        } else if(!_topUrlCheck(url, res, closeFlag)) {
+        } else if(!_topUrlCheck(url, req, res, closeFlag)) {
           ret = false;
         // 処理成功.
         } else {
@@ -922,7 +930,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
           _successJSON(res, "指定ファイルの寿命設定に成功しました:" + url);
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -946,14 +954,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // 正常処理.
         } else {
           _successJSON(res, "ファイル寿命:" + url, "" + _getExpire(name));
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -978,14 +986,14 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       try {
         // ロックタイムアウト.
         if(!successFlag) {
-          _errorLockTimeout(url, res, notCache, closeFlag);
+          _errorLockTimeout(url, req, res, notCache, closeFlag);
           ret = false;
         // 正常処理.
         } else {
           _successJSON(res, "ロックチェック結果:" + url, "" + psync.isLock(name));
         }
       } catch(e) {
-        httpCore.errorFileResult(500, e, res, closeFlag);
+        httpCore.errorFileResult(500, e, req, res, closeFlag);
         ret = false;
       } finally {
         // アンロック.
@@ -1007,7 +1015,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
     try {
       _successJSON(res, "強制ロック解除結果:" + url, "" + psync.forcedLock(topName));
     } catch(e) {
-      httpCore.errorFileResult(500, e, res, closeFlag);
+      httpCore.errorFileResult(500, e, req, res, closeFlag);
       ret = false;
     } finally {
       if(!ret) {
@@ -1083,7 +1091,7 @@ module.exports.create = function(notCache, closeFlag, serverId, systemNanoTime, 
       // 対象パスのExpire監視実行.
       _expireCheckOne(path);
     } catch(e) {
-      console.debug("error", e);
+      log.debug(e);
     }
 
     // 次のキュー管理を行う.

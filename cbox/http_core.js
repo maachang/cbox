@@ -6,6 +6,9 @@ module.exports = (function () {
 
   var constants = require("./constants");
 
+  // ロガー.
+  var log = logger.get();
+
   // 日付情報をRFC-822に変換.
   var _toRfc822 = function (n) {
     if (typeof (n) == "number") {
@@ -29,6 +32,19 @@ module.exports = (function () {
       }
     }
     return ret;
+  }
+
+  // ipアドレスを取得.
+  var _getIp = function(request) {
+    return request.headers['x-forwarded-for']
+      ? request.headers['x-forwarded-for']
+      : (request.connection && request.connection.remoteAddress)
+      ? request.connection.remoteAddress
+      : (request.connection.socket && request.connection.socket.remoteAddress)
+      ? request.connection.socket.remoteAddress
+      : (request.socket && request.socket.remoteAddress)
+      ? request.socket.remoteAddress
+      : '0.0.0.0';
   }
   
   // cros対応ヘッダを設定.
@@ -58,7 +74,7 @@ module.exports = (function () {
   }
 
   // エラー返却処理.
-  var _errorFileResult = function(status, err, res, notCache, closeFlag) {
+  var _errorFileResult = function(status, err, req, res, notCache, closeFlag) {
     var headers = {};
     var body = "";
     var message = null;
@@ -73,11 +89,16 @@ module.exports = (function () {
       } else {
         message = "" + err;
       }
-    } else if (status >= 500) {
-      if(err != null) {
-        console.error("status:" + status, err);
-      } else {
-        console.error("error: " + status);
+    }
+    if (status >= 500) {
+      if(log.isErrorEnabled()) {
+        if(err != null) {
+          log.error("status:" + status,
+            "[" + _getIp(req) + "]", err);
+        } else {
+          log.error("error: " + status,
+            "[" + _getIp(req) + "]");
+        }
       }
     }
     // 静的ファイルでも、JSONエラーを返却させる.
@@ -94,7 +115,7 @@ module.exports = (function () {
       res.writeHead(status, headers);
       res.end(body);
     } catch(e) {
-      console.debug(e);
+      log.debug(e);
     }
   }
 
@@ -187,7 +208,7 @@ module.exports = (function () {
       return true;
     } catch (e) {
       // エラーをデバッグ出力.
-      console.debug(e);
+      log.debug(e);
       // レスポンスソケットクローズ.
       try {
         res.socket.destroy();
@@ -219,7 +240,7 @@ module.exports = (function () {
       return true;
     } catch(e) {
       // エラーをデバッグ出力.
-      console.debug(e);
+      log.debug(e);
       // レスポンスソケットクローズ.
       try {
         res.socket.destroy();
@@ -252,8 +273,8 @@ module.exports = (function () {
   }
 
   // エラー処理返却.
-  o.errorFileResult = function(status, err, res, closeFlag) {
-    _errorFileResult(status, err, res, true, closeFlag);
+  o.errorFileResult = function(status, err, req, res, closeFlag) {
+    _errorFileResult(status, err, req, res, true, closeFlag);
   }
 
   // mimeTypeを取得.
@@ -277,6 +298,11 @@ module.exports = (function () {
   // trueの場合は、キャッシュデータ.
   o.isCache = function(a, b) {
     return parseInt(a / 1000) == parseInt(new Date(b).getTime() / 1000);
+  }
+
+  // ipアドレスを取得.
+  o.getIp = function(req) {
+    return _getIp(req);
   }
 
   return o;
