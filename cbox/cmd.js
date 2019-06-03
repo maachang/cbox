@@ -157,13 +157,13 @@ module.exports.create = function(cmdName, conf, port, timeout, env, serverId, no
 
     // プロセス例外ハンドラ.
     process.on('uncaughtException', function(e) {
-      log.error(e);
+      console.error(e);
       return false;
     });
 
     // promise例外ハンドラ.
     process.on('unhandledRejection', (reason) => {
-      log.error(reason);
+      console.error(reason);
       return false;
     });
     
