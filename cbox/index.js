@@ -11,19 +11,21 @@ module.exports.create = function(port, timeout, env, serverId, notCache, closeFl
   var cboxProc = require("./cbox_proc");
 
   // httpサーバ実行処理.
-  var _exec = async function(req, res) {
+  var _exec = function(req, res) {
     setImmediate(function() {
-      var rq = req; req = null;
-      var rs = res; res = null;
+      var rq = req;
+      var rs = res;
       // cboxを実行.
       cbox.execute(rq, rs);
     });
   }
 
   // httpサーバ生成.
-  var createHttp = function () {
+  var createHttp = async function () {
+    var cc = _exec;
     return http.createServer(function (req, res) {
-      _exec(req, res);
+      var c = cc;
+      c(req, res);
     })
   }
 

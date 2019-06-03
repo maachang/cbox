@@ -60,7 +60,7 @@ module.exports = (function () {
       }
       return type.substring(pp + 1, end);
     }
-  
+
     // http/httpsオプションを生成
     var _getOptions = function(method ,url, params, headers, noCache) {
       var urlPms = "";
@@ -103,7 +103,7 @@ module.exports = (function () {
       if(!opt.headers) {
         opt.headers = {};
       }
-  
+
       // パラメータが存在する場合.
       if(params) {
         if(method == "JSON") {
@@ -112,8 +112,8 @@ module.exports = (function () {
             opt.headers["content-type"] = "application/json; charset=utf-8;";
           }
           method = "POST";
-        // POST以外の場合.
-        } else if(method != "POST") {
+        // GETの場合.
+        } else if(method == "GET") {
           if(typeof(params) == "object") {
             params = querystring.stringify(params);
           } else {
@@ -124,18 +124,18 @@ module.exports = (function () {
           } else {
             opt.path += "?" + params;
           }
-        // POSTの場合.
+        // GET以外の場合.
         } else {
           // postの場合はContent-Typeが設定されていない場合はセット.
-          if(!opt.headers["content-type"]) {
+          if(method == "POST" && !opt.headers["content-type"]) {
             opt.headers["content-type"] = "application/x-www-form-urlencoded";
           }
         }
       }
-  
+
       // メソッドをセット.
       opt.method = method;
-  
+
       // ノーキャッシュの場合.
       if(noCache != false) {
         if(opt.path.indexOf("?") != -1) {
@@ -146,7 +146,7 @@ module.exports = (function () {
       }
       return opt;
     }
-  
+
     return function(method ,url, option, func, errFunc) {
       if(typeof(func) != "function") {
         throw new Error("Synchronous execution is not supported.");
@@ -161,23 +161,23 @@ module.exports = (function () {
         noCache = option["no_cache"];
       }
       method = method.toUpperCase();
-  
+
       // エラーハンドリングが設定されていない場合.
       if(typeof(errFunc) != "function") {
         errFunc = func;
       }
-  
+
       // オプション生成.
       var opt = _getOptions(method ,url, params, headers, noCache);
       headers = null;
-  
+
       // methodがJSONの場合はPOSTに変更.
       var jsonFlag = false;
       if(method == "JSON") {
         jsonFlag = true;
         method = "POST";
       }
-  
+
       // プロトコルから、httpかhttpsかのモジュール選択.
       var conn = null;
       if(opt.protocol == "http:") {
@@ -187,10 +187,10 @@ module.exports = (function () {
       } else {
         conn = http;
       }
-  
-      // POSTの場合.
-      var postParamsFlag = false;
-      if(method == "POST") {
+
+      // GET以外の場合.
+      var bodyParamsFlag = false;
+      if(method != "GET") {
         if(params) {
           if(typeof(params) == "object") {
             if((params instanceof Buffer) == false &&
@@ -211,29 +211,29 @@ module.exports = (function () {
           } else {
             opt.headers["content-length"] = "" + _utf8Length(params);
           }
-          postParamsFlag = true;
+          bodyParamsFlag = true;
         } else {
           opt.headers["content-length"] = "0";
           params = "";
-          postParamsFlag = true;
+          bodyParamsFlag = true;
         }
         // content-typeが設定されていない場合.
         if(!opt.headers["content-type"]) {
           opt.headers["content-type"] = "application/octet-stream";
         }
       }
-  
+
       // リクエストを生成.
       var req = conn.request(opt, function(res) {
         var body = null;
         var headers = res.headers;
         var charset = null;
-  
+
         // 文字コードが設定されている場合.
         if(headers["content-type"]) {
           charset = _getCharset(headers["content-type"]);
         }
-  
+
         // content-lengthがある場合.
         if(headers["content-length"]) {
           var off = 0;
@@ -275,8 +275,9 @@ module.exports = (function () {
             binLen = null;
             var len = body.length;
             for(var i = 0; i < len; i ++) {
-              n = body[i];body[i] = null;
+              n = body[i];
               n.copy(abuf, off);
+              body[i] = null;
               off += n.length;
             }
             body = null;
@@ -288,7 +289,7 @@ module.exports = (function () {
           });
         }
       });
-  
+
       // エラーハンドリング.
       req.on('error', function(e) {
         var status = e.status;
@@ -297,9 +298,9 @@ module.exports = (function () {
         }
         errFunc(status, e.message, {});
       });
-  
-      // postデータセット.
-      if(postParamsFlag) {
+
+      // bodyデータセット.
+      if(bodyParamsFlag) {
         req.write(params);
       }
       req.end();
@@ -331,32 +332,29 @@ module.exports = (function () {
         var allLen = allLen = bin.length ;
         var etc = (allLen % 3)|0;
         var len = (allLen / 3)|0;
-        var ary = new Array((len * 4) + ((etc != 0) ? 4 : 0));
+        var ret = "";
         for (i = 0, j = 0, k = 0; i < len; i++, j += 3, k += 4) {
-          ary[k] = ENC_CD[((bin[j] & 0x000000fc) >> 2)];
-          ary[k + 1] = ENC_CD[(((bin[j] & 0x00000003) << 4) | ((bin[j+1] & 0x000000f0) >> 4))];
-          ary[k + 2] = ENC_CD[(((bin[j+1] & 0x0000000f) << 2) | ((bin[j+2] & 0x000000c0) >> 6))];
-          ary[k + 3] = ENC_CD[(bin[j+2] & 0x0000003f)];
+          ret += ENC_CD[((bin[j] & 0x000000fc) >> 2)] +
+            ENC_CD[(((bin[j] & 0x00000003) << 4) | ((bin[j+1] & 0x000000f0) >> 4))] +
+            ENC_CD[(((bin[j+1] & 0x0000000f) << 2) | ((bin[j+2] & 0x000000c0) >> 6))] +
+            ENC_CD[(bin[j+2] & 0x0000003f)];
         }
         switch (etc) {
         case 1:
           j = len * 3;
           k = len * 4;
-          ary[k] = ENC_CD[((bin[j] & 0x000000fc) >> 2)];
-          ary[k + 1] = ENC_CD[((bin[j] & 0x00000003) << 4)];
-          ary[k + 2] = EQ;
-          ary[k + 3] = EQ;
+          ret += ENC_CD[((bin[j] & 0x000000fc) >> 2)] +
+            ENC_CD[((bin[j] & 0x00000003) << 4)] + EQ + EQ;
           break;
         case 2:
           j = len * 3;
           k = len * 4;
-          ary[k] = ENC_CD[((bin[j] & 0x000000fc) >> 2)];
-          ary[k + 1] = ENC_CD[(((bin[j] & 0x00000003) << 4) | ((bin[j+1] & 0x000000f0) >> 4))];
-          ary[k + 2] = ENC_CD[(((bin[j+1] & 0x0000000f) << 2))];
-          ary[k + 3] = EQ;
+          ret += ENC_CD[((bin[j] & 0x000000fc) >> 2)] +
+            ENC_CD[(((bin[j] & 0x00000003) << 4) | ((bin[j+1] & 0x000000f0) >> 4))] +
+            ENC_CD[(((bin[j+1] & 0x0000000f) << 2))] + EQ;
           break;
         }
-        return ary.join('');
+        return ret;
       }
       o.decode = function(base64) {
         var i, j, k;
