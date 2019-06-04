@@ -10,25 +10,6 @@ module.exports.create = function(conf, port, timeout, env, serverId, notCache, c
     conf, port, timeout, env, serverId, notCache, closeFlag, systemNanoTime);
   var cboxProc = require("./cbox_proc");
 
-  // httpサーバ実行処理.
-  var _exec = async function(req, res) {
-    setImmediate(function() {
-      var rq = req;
-      var rs = res;
-      // cboxを実行.
-      cbox.execute(rq, rs);
-    });
-  }
-
-  // httpサーバ生成.
-  var createHttp = function () {
-    var cc = _exec;
-    return http.createServer(function (req, res) {
-      var c = cc;
-      c(req, res);
-    })
-  }
-
   // プロセス例外ハンドラ.
   process.on('uncaughtException', function(e) {
     console.trace(e, e);
@@ -46,13 +27,37 @@ module.exports.create = function(conf, port, timeout, env, serverId, notCache, c
     cboxProc.isStartCbox());
 
   // cboxに対して現在の実行環境コンフィグをセット.
-  cbox.setEnvConf(sysParams.getEnvConf())
+  cbox.setEnvConf(sysParams.getEnvConf());
+
+  // httpサーバ実行処理.
+  var _exec = function(req, res) {
+    setImmediate(function() {
+      var rq = req;
+      var rs = res;
+      // cboxを実行.
+      cbox.execute(rq, rs);
+    });
+  }
 
   // サーバー生成.
-  var server = createHttp();
+  var server = http.createServer(function (req, res) {
+    _exec(req, res);
+  });
   
   // タイムアウトセット.
   server.setTimeout(sysParams.getTimeout());
+
+  // キープアライブタイムアウトをセット.
+  server.keepAliveTimeout = 2500;
+
+  // maxHeadersCountはゼロにセット.
+  server.maxHeadersCount = 0;
+
+  // http.socketオプションを設定.
+  server.on("connection", function(socket) {
+    socket.setNoDelay(true);
+    socket.setKeepAlive(false, 0);
+  });
 
   // 指定ポートで待つ.
   server.listen(sysParams.getPort());
